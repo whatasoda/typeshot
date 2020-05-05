@@ -7,6 +7,7 @@ module.exports = {
     project: './tsconfig.json',
   },
   rules: {
+    'no-redeclare': 0,
     'no-console': 'error',
     'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/no-unused-vars': [2, { args: 'none' }],

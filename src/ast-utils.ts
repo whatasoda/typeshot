@@ -1,6 +1,7 @@
 import ts from 'typescript';
 import path from 'path';
 import { TemplateSymbols } from './symbols';
+import type { DefaultEntry } from '.';
 
 type CallLikeExpression = Exclude<
   ts.CallLikeExpression,
@@ -74,7 +75,7 @@ export const createNameNode = (name: typeshot.NameDescriptor) => {
   }
 };
 
-export const createTemplateExpression = ([head, ...template]: string[], substitutions: typeshot.TemplateSymbols[]) => {
+export const createTemplateExpression = ([head, ...template]: string[], substitutions: TemplateSymbols[]) => {
   const lastIndex = template.length - 1;
   return ts.createTemplateExpression(
     ts.createTemplateHead(head),
@@ -88,14 +89,14 @@ export const createTemplateExpression = ([head, ...template]: string[], substitu
 };
 
 const TemplateSymbolKeys = Object.keys(TemplateSymbols) as (keyof typeof TemplateSymbols)[];
-export const createTemplateSymbolNode = (symbol: typeshot.TemplateSymbols) => {
+export const createTemplateSymbolNode = (symbol: TemplateSymbols) => {
   return ts.createPropertyAccess(
     ts.createPropertyAccess(ts.createIdentifier('typeshot'), ts.createIdentifier('TemplateSymbols')),
     ts.createIdentifier(TemplateSymbolKeys.find((name) => TemplateSymbols[name] === symbol) || ''),
   );
 };
 
-export const createTypeshotStatementFromEntry = (entry: typeshot.DefaultEntry) => {
+export const createTypeshotStatementFromEntry = (entry: DefaultEntry) => {
   const tag = ts.createCall(
     ts.createIdentifier('typeshot'),
     [entry.type],

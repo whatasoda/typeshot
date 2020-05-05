@@ -1,7 +1,8 @@
 import ts from 'typescript';
 import { createTypeNodeFromPrimitiveParameter } from './ast-utils';
+import type { DynamicEntry } from '.';
 
-export const injectTypeParameters = (entry: typeshot.DynamicEntry): ts.TypeNode => {
+export const injectTypeParameters = (entry: DynamicEntry): ts.TypeNode => {
   const params = entry.params.map<ts.TypeNode>((param) => {
     if (Array.isArray(param)) {
       return ts.createUnionTypeNode(param.map(createTypeNodeFromPrimitiveParameter));

@@ -1,5 +1,6 @@
 import ts from 'typescript';
 import { flattenCallLikeExpressionChain } from './ast-utils';
+import type { TypeEntry, TypeEntryContainer } from '.';
 
 const SECTIONS = ['OUTPUT_HEADER', 'HEADER', 'MAIN', 'FOOTER', 'OUTPUT_FOOTER'] as const;
 type OneOfSection = typeof SECTIONS[number];
@@ -62,7 +63,7 @@ export const splitStatements = (source: ts.SourceFile) => {
 };
 
 export const parseTypeEntriesFromStatements = (statements: ReadonlyArray<ts.Statement>) => {
-  const entries: typeshot.TypeEntry[] = [];
+  const entries: TypeEntry[] = [];
   statements.forEach((stmt) => {
     if (ts.isExpressionStatement(stmt)) {
       const entry = parseTypeshotExpression(stmt.expression);
@@ -94,7 +95,7 @@ export const parseTypeEntriesFromStatements = (statements: ReadonlyArray<ts.Stat
 
   if (!entries.length) return null;
 
-  return entries.reduce<typeshot.TypeEntryContainer>(
+  return entries.reduce<TypeEntryContainer>(
     (acc, entry) => {
       if (entry.key in acc[entry.mode]) {
         // eslint-disable-next-line no-console
@@ -108,7 +109,7 @@ export const parseTypeEntriesFromStatements = (statements: ReadonlyArray<ts.Stat
   );
 };
 
-export const parseTypeshotExpression = (entry: ts.Expression): typeshot.TypeEntry | null => {
+export const parseTypeshotExpression = (entry: ts.Expression): TypeEntry | null => {
   const phases = flattenCallLikeExpressionChain(entry);
   const topPhase = phases[0];
   if (!(topPhase && ts.isCallExpression(topPhase))) return null;

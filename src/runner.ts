@@ -8,6 +8,7 @@ import { parseTypeEntriesFromStatements, splitStatements, COMMENT_NODES } from '
 import { injectTypeParameters, applyNamesToTypeNode } from './injector';
 import { createTypeshotStatementFromEntry, updateImportPath } from './ast-utils';
 import { serializeEntry } from './serialize';
+import type { Config, ValueEntry, DefaultEntry, Typeshot } from '.';
 
 interface Relay {
   header: string;
@@ -17,18 +18,7 @@ interface Relay {
   relativePath: string;
 }
 
-const getPrettierOptions = (basePath: string, sys: ts.System) => {
-  const prettierrc = path.resolve(basePath, '.prettierrc');
-  try {
-    if (sys.fileExists(prettierrc)) return JSON.parse(sys.readFile(prettierrc)!) as prettier.Options;
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.log(e);
-  }
-  return;
-};
-
-const runAll = (typeshotConfig: typeshot.Config, sys: ts.System = ts.sys) => {
+const runTypeshot = (typeshotConfig: Config, sys: ts.System = ts.sys) => {
   const { basePath = process.cwd(), project = `${basePath}/tsconfig.json` } = typeshotConfig;
   const prettierOptions = typeshotConfig.prettierOptions || getPrettierOptions(basePath, sys);
 
@@ -85,7 +75,7 @@ const handlePreSource = (file: string, program: ts.Program, printer: ts.Printer)
     return;
   }
 
-  const entries: typeshot.ValueEntry[] = [];
+  const entries: ValueEntry[] = [];
   const [typeshot, container] = createPreTypeshot(typeEntries, entries);
   transpileAndRun(typeshot, source, program.getCompilerOptions());
 
@@ -152,7 +142,7 @@ const handlePostSource = (relay: Relay, program: ts.Program, checker: ts.TypeChe
     return;
   }
 
-  const entries: typeshot.DefaultEntry[] = [];
+  const entries: DefaultEntry[] = [];
   const typeshot = createPostTypeshot(typeEntries, entries);
   transpileAndRun(typeshot, source, program.getCompilerOptions());
 
@@ -173,7 +163,7 @@ const handlePostSource = (relay: Relay, program: ts.Program, checker: ts.TypeChe
   ].join('');
 };
 
-const transpileAndRun = (typeshot: typeshot.Typeshot, source: ts.SourceFile, options: ts.CompilerOptions) => {
+const transpileAndRun = (typeshot: Typeshot, source: ts.SourceFile, options: ts.CompilerOptions) => {
   try {
     const JS = ts.transpile(source.getFullText(), options);
     vm.runInNewContext(JS, { typeshot });
@@ -184,4 +174,15 @@ const transpileAndRun = (typeshot: typeshot.Typeshot, source: ts.SourceFile, opt
   }
 };
 
-runAll({ test: /\.typeshot\.ts$/ });
+const getPrettierOptions = (basePath: string, sys: ts.System) => {
+  const prettierrc = path.resolve(basePath, '.prettierrc');
+  try {
+    if (sys.fileExists(prettierrc)) return JSON.parse(sys.readFile(prettierrc)!) as prettier.Options;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.log(e);
+  }
+  return;
+};
+
+runTypeshot({ test: /\.typeshot\.ts$/ });

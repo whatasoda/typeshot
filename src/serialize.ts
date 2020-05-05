@@ -1,10 +1,11 @@
 import ts from 'typescript';
 import { TemplateSymbols } from './symbols';
+import type { DefaultEntry } from '.';
 
 const dummySource = ts.createSourceFile('dummy.ts', '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
 
 export const serializeEntry = (
-  { type: typeNode, template, substitutions, name }: typeshot.DefaultEntry,
+  { type: typeNode, template, substitutions, name }: DefaultEntry,
   checker: ts.TypeChecker,
   printer: ts.Printer,
 ) => {
