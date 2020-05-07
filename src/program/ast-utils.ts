@@ -1,7 +1,7 @@
 import ts from 'typescript';
 import path from 'path';
-import { TemplateSymbols } from './symbols';
-import type { DefaultEntry } from '.';
+import type { TypeshotEntry } from './decls';
+import { TemplateSymbols, PrimitiveParameter, NameDescriptor } from '../typeshot';
 
 type CallLikeExpression = Exclude<
   ts.CallLikeExpression,
@@ -37,7 +37,7 @@ export const flattenCallLikeExpressionChain = (entry: ts.Expression) => {
   return result.reverse();
 };
 
-export const createTypeNodeFromPrimitiveParameter = (value: typeshot.PrimitiveParameter) => {
+export const createTypeNodeFromPrimitiveParameter = (value: PrimitiveParameter) => {
   return value === null
     ? ts.createNull()
     : value === undefined
@@ -63,7 +63,7 @@ export const createStringArrayNode = (array: string[]) => {
   return ts.createArrayLiteral(array.map((text) => ts.createStringLiteral(text)));
 };
 
-export const createNameNode = (name: typeshot.NameDescriptor) => {
+export const createNameNode = (name: NameDescriptor) => {
   if (typeof name === 'string') {
     return ts.createStringLiteral(name);
   } else if (Array.isArray(name)) {
@@ -96,9 +96,9 @@ export const createTemplateSymbolNode = (symbol: TemplateSymbols) => {
   );
 };
 
-export const createTypeshotStatementFromEntry = (entry: DefaultEntry) => {
+export const createTypeshotStatementFromEntry = (entry: TypeshotEntry) => {
   const tag = ts.createCall(
-    ts.createIdentifier('typeshot'),
+    ts.createPropertyAccess(ts.createIdentifier('typeshot'), 'snapshot'),
     [entry.type],
     [ts.createStringLiteral(entry.key), createNameNode(entry.name)],
   );
@@ -107,11 +107,7 @@ export const createTypeshotStatementFromEntry = (entry: DefaultEntry) => {
   return ts.createExpressionStatement(ts.createTaggedTemplate(tag, template));
 };
 
-export const getNameEntries = (
-  names: typeshot.NameDescriptor,
-  type: ts.Type,
-  checker: ts.TypeChecker,
-): [string, ts.Type][] => {
+export const getNameEntries = (names: NameDescriptor, type: ts.Type, checker: ts.TypeChecker): [string, ts.Type][] => {
   if (typeof names === 'string') {
     return [[names, type]];
   } else if (typeof names === 'object' && names) {

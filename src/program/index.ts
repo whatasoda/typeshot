@@ -1,14 +1,13 @@
 import ts from 'typescript';
-import vm from 'vm';
 import prettier from 'prettier';
 import path from 'path';
-import { prepareProgram } from './program';
-import { createPreTypeshot, createPostTypeshot } from './factories';
 import { parseTypeEntriesFromStatements, splitStatements, COMMENT_NODES } from './parsers';
-import { injectTypeParameters, applyNamesToTypeNode } from './injector';
 import { createTypeshotStatementFromEntry, updateImportPath } from './ast-utils';
 import { serializeEntry } from './serialize';
-import type { Config, ValueEntry, DefaultEntry, Typeshot } from '.';
+import type { ProgramConfig } from './decls';
+import runSourceWithContext from '../context';
+
+import '../typeshot';
 
 interface Relay {
   header: string;
@@ -18,7 +17,7 @@ interface Relay {
   relativePath: string;
 }
 
-const runTypeshot = (typeshotConfig: Config, sys: ts.System = ts.sys) => {
+const runTypeshot = (typeshotConfig: ProgramConfig, sys: ts.System = ts.sys) => {
   const { basePath = process.cwd(), project = `${basePath}/tsconfig.json` } = typeshotConfig;
   const prettierOptions = typeshotConfig.prettierOptions || getPrettierOptions(basePath, sys);
 
@@ -29,7 +28,7 @@ const runTypeshot = (typeshotConfig: Config, sys: ts.System = ts.sys) => {
   };
 
   const printer = ts.createPrinter();
-  const program = prepareProgram(basePath, project, sys, formatHost);
+  const program = createTSProgram(basePath, project, sys, formatHost);
   program.getTypeChecker();
 
   const messages: string[] = [];
@@ -49,7 +48,7 @@ const runTypeshot = (typeshotConfig: Config, sys: ts.System = ts.sys) => {
   });
 
   if (relays.length) {
-    const program = prepareProgram(basePath, project, sys, formatHost, extraFiles);
+    const program = createTSProgram(basePath, project, sys, formatHost, extraFiles);
     const checker = program.getTypeChecker();
 
     relays.forEach((relay) => {
@@ -75,32 +74,16 @@ const handlePreSource = (file: string, program: ts.Program, printer: ts.Printer)
     return;
   }
 
-  const entries: ValueEntry[] = [];
-  const [typeshot, container] = createPreTypeshot(typeEntries, entries);
-  transpileAndRun(typeshot, source, program.getCompilerOptions());
+  const context = runSourceWithContext(source, program.getCompilerOptions(), {
+    mode: 'pre',
+    types: typeEntries,
+    entries: [],
+    dynamicEntryCount: 0,
+  });
 
-  const statements = entries.reduce<ts.Statement[]>((acc, entry) => {
-    switch (entry.mode) {
-      case 'default': {
-        acc.push(createTypeshotStatementFromEntry(entry));
-        return acc;
-      }
-      case 'dynamic': {
-        // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars
-        const { params: _, names, ...common } = entry;
-        const injected = injectTypeParameters(entry);
-        const namedTypes = applyNamesToTypeNode(names, injected);
-        namedTypes.forEach(([name, type]) => {
-          acc.push(createTypeshotStatementFromEntry({ ...common, mode: 'default', name, type }));
-        });
-        return acc;
-      }
-      default:
-        return acc;
-    }
-  }, []);
+  const statements = context.entries.map(createTypeshotStatementFromEntry);
 
-  const header = container.header || '';
+  const header = context.header || '';
   const content = printer.printFile(
     ts.updateSourceFileNode(
       source,
@@ -116,7 +99,7 @@ const handlePreSource = (file: string, program: ts.Program, printer: ts.Printer)
     ),
   );
 
-  const output = container.config?.output;
+  const output = context.config?.output;
   const { dir, name } = path.parse(file);
   const tempFilePath = path.join(dir, `${name}.typeshot-tmp.ts`);
   const snapshotPath = output
@@ -142,9 +125,12 @@ const handlePostSource = (relay: Relay, program: ts.Program, checker: ts.TypeChe
     return;
   }
 
-  const entries: DefaultEntry[] = [];
-  const typeshot = createPostTypeshot(typeEntries, entries);
-  transpileAndRun(typeshot, source, program.getCompilerOptions());
+  const context = runSourceWithContext(source, program.getCompilerOptions(), {
+    mode: 'post',
+    types: typeEntries,
+    entries: [],
+    dynamicEntryCount: 0,
+  });
 
   return [
     header,
@@ -153,7 +139,7 @@ const handlePostSource = (relay: Relay, program: ts.Program, checker: ts.TypeChe
       ts.createNodeArray(sections.OUTPUT_HEADER.map((s) => updateImportPath(s, relativePath))),
       source,
     ),
-    entries.map((entry) => serializeEntry(entry, checker, printer)).join(''),
+    context.entries.map((entry) => serializeEntry(entry, checker, printer)).join(''),
     printer.printList(
       ts.ListFormat.None,
       ts.createNodeArray(sections.OUTPUT_FOOTER.map((s) => updateImportPath(s, relativePath))),
@@ -161,17 +147,6 @@ const handlePostSource = (relay: Relay, program: ts.Program, checker: ts.TypeChe
     ),
     '\nexport {};\n',
   ].join('');
-};
-
-const transpileAndRun = (typeshot: Typeshot, source: ts.SourceFile, options: ts.CompilerOptions) => {
-  try {
-    const JS = ts.transpile(source.getFullText(), options);
-    vm.runInNewContext(JS, { typeshot });
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.log(e);
-    return;
-  }
 };
 
 const getPrettierOptions = (basePath: string, sys: ts.System) => {
@@ -183,6 +158,36 @@ const getPrettierOptions = (basePath: string, sys: ts.System) => {
     console.log(e);
   }
   return;
+};
+
+export const createTSProgram = (
+  basePath: string,
+  project: string,
+  sys: ts.System,
+  formatHost: ts.FormatDiagnosticsHost,
+  extraFiles?: string[],
+) => {
+  const configContent = ts.readConfigFile(project, sys.readFile);
+  if (configContent.error) {
+    // eslint-disable-next-line no-console
+    console.error(ts.formatDiagnostic(configContent.error, formatHost));
+    process.exit(1);
+  }
+
+  const tsconfig = ts.parseJsonConfigFileContent(configContent.config, sys, basePath);
+  if (tsconfig.errors.length) {
+    // eslint-disable-next-line no-console
+    console.error(ts.formatDiagnostics(tsconfig.errors, formatHost));
+    process.exit(1);
+  }
+
+  const program = ts.createProgram({
+    rootNames: extraFiles ? [...extraFiles, ...tsconfig.fileNames] : tsconfig.fileNames,
+    options: tsconfig.options,
+    projectReferences: tsconfig.projectReferences,
+  });
+
+  return program;
 };
 
 runTypeshot({ test: /\.typeshot\.ts$/ });

@@ -1,9 +1,9 @@
 import ts from 'typescript';
-import { createTypeNodeFromPrimitiveParameter } from './ast-utils';
-import type { DynamicEntry } from '.';
+import { createTypeNodeFromPrimitiveParameter } from './program/ast-utils';
+import typeshot, { TypeParameter } from './typeshot';
 
-export const injectTypeParameters = (entry: DynamicEntry): ts.TypeNode => {
-  const params = entry.params.map<ts.TypeNode>((param) => {
+export const injectTypeParameters = (params: TypeParameter[], type: ts.TypeNode): ts.TypeNode => {
+  const paramNodes = params.map<ts.TypeNode>((param) => {
     if (Array.isArray(param)) {
       return ts.createUnionTypeNode(param.map(createTypeNodeFromPrimitiveParameter));
     } else if (typeof param === 'object' && param && ts.isTypeNode(param)) {
@@ -13,7 +13,6 @@ export const injectTypeParameters = (entry: DynamicEntry): ts.TypeNode => {
     }
   });
 
-  const { type } = entry;
   const stack: [number, ts.TypeNode][] = [[-1, type]];
   const flatTree: [number, ts.TypeNode][] = [];
   while (stack.length) {
@@ -27,7 +26,7 @@ export const injectTypeParameters = (entry: DynamicEntry): ts.TypeNode => {
     }
   }
 
-  let pointer = params.length - 1;
+  let pointer = paramNodes.length - 1;
   const updateStack: number[] = [];
   const updateFlattenTree = (parentIdx: number, idx: number, node: ts.TypeNode) => {
     flatTree[idx][1] = node;
@@ -41,7 +40,7 @@ export const injectTypeParameters = (entry: DynamicEntry): ts.TypeNode => {
     if (!ts.isTypeReferenceNode(curr)) continue;
 
     if (curr.typeName.getText() === 'typeshot.T') {
-      if (pointer !== -1) updateFlattenTree(parentIdx, idx, params[pointer--]);
+      if (pointer !== -1) updateFlattenTree(parentIdx, idx, paramNodes[pointer--]);
     } else if (updateStack[updateStack.length - 1] === idx) {
       updateStack.pop();
       const typeArguments: ts.TypeNode[] = [];
@@ -59,13 +58,7 @@ export const injectTypeParameters = (entry: DynamicEntry): ts.TypeNode => {
     }
   }
 
-  const injected = flatTree[0][1];
-  if (type === injected) {
-    // eslint-disable-next-line no-console
-    console.warn(`Nothing injected to '${entry.key}'.`);
-  }
-
-  return injected;
+  return flatTree[0][1];
 };
 
 export const applyNamesToTypeNode = (name: typeshot.NameDescriptor, type: ts.TypeNode): [string, ts.TypeNode][] => {

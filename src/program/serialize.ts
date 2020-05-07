@@ -1,11 +1,11 @@
 import ts from 'typescript';
-import { TemplateSymbols } from './symbols';
-import type { DefaultEntry } from '.';
+import type { TypeshotEntry } from './decls';
+import { TemplateSymbols } from '../typeshot';
 
 const dummySource = ts.createSourceFile('dummy.ts', '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
 
 export const serializeEntry = (
-  { type: typeNode, template, substitutions, name }: DefaultEntry,
+  { type: typeNode, template, substitutions, name }: TypeshotEntry,
   checker: ts.TypeChecker,
   printer: ts.Printer,
 ) => {
@@ -16,7 +16,6 @@ export const serializeEntry = (
     ts.NodeBuilderFlags.InTypeAlias |
       ts.NodeBuilderFlags.NoTruncation |
       ts.NodeBuilderFlags.IgnoreErrors |
-      ts.NodeBuilderFlags.UseFullyQualifiedType |
       ts.NodeBuilderFlags.MultilineObjectLiterals |
       ts.NodeBuilderFlags.GenerateNamesForShadowedTypeParams,
   );

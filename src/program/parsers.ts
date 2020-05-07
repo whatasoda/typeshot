@@ -1,6 +1,6 @@
 import ts from 'typescript';
 import { flattenCallLikeExpressionChain } from './ast-utils';
-import type { TypeEntry, TypeEntryContainer } from '.';
+import type { TypeInformation } from './decls';
 
 const SECTIONS = ['OUTPUT_HEADER', 'HEADER', 'MAIN', 'FOOTER', 'OUTPUT_FOOTER'] as const;
 type OneOfSection = typeof SECTIONS[number];
@@ -63,13 +63,13 @@ export const splitStatements = (source: ts.SourceFile) => {
 };
 
 export const parseTypeEntriesFromStatements = (statements: ReadonlyArray<ts.Statement>) => {
-  const entries: TypeEntry[] = [];
+  const entries: TypeInformation[] = [];
   statements.forEach((stmt) => {
     if (ts.isExpressionStatement(stmt)) {
       const entry = parseTypeshotExpression(stmt.expression);
       if (!entry) return;
       entries.push(entry);
-      if (entry.mode === 'dynamic') {
+      if (entry.key.startsWith('dynamic')) {
         // TODO: warning since we expect 'default' mode entry here
       }
     }
@@ -86,7 +86,7 @@ export const parseTypeEntriesFromStatements = (statements: ReadonlyArray<ts.Stat
         const entry = parseTypeshotExpression(decl.initializer);
         if (!entry) return;
         entries.push(entry);
-        if (entry.mode === 'default') {
+        if (entry.key.startsWith('static')) {
           // TODO: warning since we expect 'dynamic' mode entry here
         }
       });
@@ -95,21 +95,18 @@ export const parseTypeEntriesFromStatements = (statements: ReadonlyArray<ts.Stat
 
   if (!entries.length) return null;
 
-  return entries.reduce<TypeEntryContainer>(
-    (acc, entry) => {
-      if (entry.key in acc[entry.mode]) {
-        // eslint-disable-next-line no-console
-        console.warn(`Duplicated key for ${entry.mode} mode found! Skipped '${entry.key}'.`);
-      } else {
-        acc[entry.mode][entry.key] = entry;
-      }
-      return acc;
-    },
-    { default: Object.create(null), dynamic: Object.create(null) },
-  );
+  return entries.reduce<Record<string, TypeInformation>>((acc, entry) => {
+    if (entry.key in acc) {
+      // eslint-disable-next-line no-console
+      console.warn(`Duplicated key found! Skipped '${entry.key}'.`);
+    } else {
+      acc[entry.key] = entry;
+    }
+    return acc;
+  }, Object.create(null));
 };
 
-export const parseTypeshotExpression = (entry: ts.Expression): TypeEntry | null => {
+export const parseTypeshotExpression = (entry: ts.Expression): TypeInformation | null => {
   const phases = flattenCallLikeExpressionChain(entry);
   const topPhase = phases[0];
   if (!(topPhase && ts.isCallExpression(topPhase))) return null;
@@ -117,13 +114,15 @@ export const parseTypeshotExpression = (entry: ts.Expression): TypeEntry | null 
   const text = topPhase.expression.getText().replace(/\s/g, '');
   const keyNode = topPhase.arguments[0];
 
-  if (!(ts.isStringLiteral(keyNode) && type && (text === 'typeshot' || text === 'typeshot.dynamic'))) return null;
+  if (!(ts.isStringLiteral(keyNode) && type && (text === 'typeshot.snapshot' || text === 'typeshot.dynamic'))) {
+    return null;
+  }
 
   const key = keyNode.text;
-  const writePhase = phases[text === 'typeshot' ? 1 : 2];
+  const writePhase = phases[text === 'typeshot.snapshot' ? 1 : 2];
   if (!ts.isTaggedTemplateExpression(writePhase) || writePhase !== entry /* should have no appendix */) return null;
 
-  if (text === 'typeshot') return { mode: 'default', type, key: `default:${key}` };
+  if (text === 'typeshot.snapshot') return { type, key: `static:${key}` };
 
   if (text === 'typeshot.dynamic') {
     const parameterPhase = phases[1];
@@ -135,7 +134,7 @@ export const parseTypeshotExpression = (entry: ts.Expression): TypeEntry | null 
       )
     ) return null; // eslint-disable-line prettier/prettier
 
-    return { mode: 'dynamic', type, key: `dynamic:${key}` };
+    return { type, key: `dynamic:${key}` };
   }
 
   return null;
