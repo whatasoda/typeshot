@@ -6,7 +6,6 @@ import { createTypeshotStatementFromEntry, updateImportPath } from './ast-utils'
 import { serializeEntry } from './serialize';
 import type { ProgramConfig } from './decls';
 import runSourceWithContext from '../context';
-
 import '../typeshot';
 
 interface Relay {
@@ -160,7 +159,7 @@ const getPrettierOptions = (basePath: string, sys: ts.System) => {
   return;
 };
 
-export const createTSProgram = (
+const createTSProgram = (
   basePath: string,
   project: string,
   sys: ts.System,
@@ -190,4 +189,4 @@ export const createTSProgram = (
   return program;
 };
 
-runTypeshot({ test: /\.typeshot\.ts$/ });
+export default runTypeshot;
