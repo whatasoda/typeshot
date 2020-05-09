@@ -106,6 +106,16 @@ export const parseTypeEntriesFromStatements = (statements: ReadonlyArray<ts.Stat
   }, Object.create(null));
 };
 
+const keyMap = {
+  static: 'typeshot.takeStatic',
+  dynamic: 'typeshot.createDynamic',
+};
+const writerPhaseIndexMap = {
+  'typeshot.takeStatic': 1,
+  'typeshot.createDynamic': 3,
+};
+const keyList = Object.values(keyMap);
+
 export const parseTypeshotExpression = (entry: ts.Expression): TypeInformation | null => {
   const phases = flattenCallLikeExpressionChain(entry);
   const topPhase = phases[0];
@@ -114,25 +124,26 @@ export const parseTypeshotExpression = (entry: ts.Expression): TypeInformation |
   const text = topPhase.expression.getText().replace(/\s/g, '');
   const keyNode = topPhase.arguments[0];
 
-  if (!(ts.isStringLiteral(keyNode) && type && (text === 'typeshot.snapshot' || text === 'typeshot.dynamic'))) {
+  if (!(ts.isStringLiteral(keyNode) && type && keyList.includes(text))) {
     return null;
   }
 
   const key = keyNode.text;
-  const writePhase = phases[text === 'typeshot.snapshot' ? 1 : 2];
+  const writePhase = phases[writerPhaseIndexMap[text as keyof typeof writerPhaseIndexMap]];
   if (!ts.isTaggedTemplateExpression(writePhase) || writePhase !== entry /* should have no appendix */) return null;
 
-  if (text === 'typeshot.snapshot') return { type, key: `static:${key}` };
+  if (text === keyMap.static) return { type, key: `static:${key}` };
 
-  if (text === 'typeshot.dynamic') {
-    const parameterPhase = phases[1];
-    if (
-      !(
-        ts.isCallExpression(parameterPhase) &&
-        ts.isPropertyAccessExpression(parameterPhase.expression) &&
-        parameterPhase.expression.name.text === 'parameters'
-      )
-    ) return null; // eslint-disable-line prettier/prettier
+  if (text === keyMap.dynamic) {
+    const phaseMatched = ['parameters', 'names'].every((text, i) => {
+      const phase = phases[i + 1];
+      return (
+        ts.isCallExpression(phase) &&
+        ts.isPropertyAccessExpression(phase.expression) &&
+        phase.expression.name.text === text
+      );
+    });
+    if (!phaseMatched) return null;
 
     return { type, key: `dynamic:${key}` };
   }

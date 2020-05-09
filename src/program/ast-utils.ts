@@ -98,7 +98,7 @@ export const createTemplateSymbolNode = (symbol: TemplateSymbols) => {
 
 export const createTypeshotStatementFromEntry = (entry: TypeshotEntry) => {
   const tag = ts.createCall(
-    ts.createPropertyAccess(ts.createIdentifier('typeshot'), 'snapshot'),
+    ts.createPropertyAccess(ts.createIdentifier('typeshot'), 'takeStatic'),
     [entry.type],
     [ts.createStringLiteral(entry.key), createNameNode(entry.name)],
   );
