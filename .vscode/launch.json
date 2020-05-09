@@ -14,7 +14,7 @@
         "ts-node/register",
         // this makes the process hold until a debugger connected 9229
         "--inspect-brk=9229",
-        "${file}"
+        "${workspaceFolder}/sample/init.ts"
       ],
       "env": {
         "TS_NODE_FILES": "true",
