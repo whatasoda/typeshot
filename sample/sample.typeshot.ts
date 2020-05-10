@@ -1,10 +1,15 @@
+import typeshot from 'typeshot';
+/** define output destination and header */
+typeshot.configuration({ output: './sample.generated.ts' })`
+// DO NOT EDIT - GENERATED FILE
+`;
+
 // typeshot-output-header
 import type { Options } from 'prettier';
 interface SomeInterface {}
 type SomeType = {};
 
 // typeshot-header
-import typeshot from '../src/typeshot';
 
 interface SomeTypeMap {
   hoge: SomeType;
@@ -14,13 +19,8 @@ interface SomeTypeMap {
 type MappedType<T extends Record<string, any>> = {
   [K in keyof T]: { name: K; value: T[K] };
 };
+
 // typeshot-main
-
-/** define output destination and header */
-typeshot.configuration({ output: './sample.generated.ts' })`
-// DO NOT EDIT - GENERATED FILE
-`;
-
 typeshot.takeStatic<MappedType<SomeTypeMap> /* target type */>('Hoge' /* internal key */, 'Hoge' /* name */)`
   export ${typeshot.TemplateSymbols.DECLARATION}
 `;
