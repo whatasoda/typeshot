@@ -1,7 +1,7 @@
 {
   "name": "typeshot",
   "version": "1.0.0",
-  "description": "## Installation",
+  "description": "typeshot is a code generator like snapshot library, for TypeScript Declaration Files",
   "main": "index.js",
   "scripts": {
     "build": "rimraf ./lib && tsc -p tsconfig.lib.json && cp package.json README.md LICENSE ./lib",

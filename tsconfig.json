@@ -25,6 +25,10 @@
     "outDir": "lib",
     "declaration": true,
     "typeRoots": ["node_modules/@types"],
+    "baseUrl": ".",
+    "paths": {
+      "typeshot": ["./src/typeshot.ts"]
+    },
   },
   "exclude": ["node_modules"],
   "include": ["**/*"],
