@@ -2,6 +2,7 @@ import ts from 'typescript';
 import vm from 'vm';
 import type { TypeshotEntry, TypeInformation } from './program/decls';
 import type { Config } from './typeshot';
+import { Module } from 'module';
 
 export interface TypeshotContext {
   readonly mode: 'pre' | 'post';
@@ -23,9 +24,17 @@ const runSourceWithContext = (
 ): TypeshotContext => {
   const prev = CURRENT_TYPESHOT_CONTEXT.current;
   try {
+    const { fileName } = source;
     const executableCode = ts.transpile(source.getFullText(), options);
+
+    const MODULE = new Module(fileName, module);
+    const pure = MODULE.require;
+    MODULE.filename = fileName;
+    MODULE.require = ((id) => (id === 'typeshot' ? require('./typeshot') : pure.call(MODULE, id))) as typeof require;
+    Object.assign(MODULE.require, pure);
+
     CURRENT_TYPESHOT_CONTEXT.current = context;
-    vm.runInNewContext(executableCode, { exports: {}, require });
+    vm.runInNewContext(executableCode, MODULE);
   } catch (e) {
     // eslint-disable-next-line no-console
     console.log(e);
@@ -34,5 +43,6 @@ const runSourceWithContext = (
   }
   return context;
 };
+runSourceWithContext.hoge = () => require('./typeshot');
 
 export default runSourceWithContext;

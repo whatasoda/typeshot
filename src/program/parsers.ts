@@ -49,15 +49,13 @@ export const splitStatements = (source: ts.SourceFile) => {
     });
   });
 
-  splitters
-    .map((_, i) => {
-      while (i < SECTIONS.length) {
-        const curr = splitters[i++];
-        if (typeof curr === 'number') return curr;
-      }
-      return source.statements.length - 1;
-    })
-    .forEach((index, i, arr) => (sections[SECTIONS[i]] = source.statements.slice(index, arr[i + 1])));
+  SECTIONS.map((_, i) => {
+    while (i < SECTIONS.length) {
+      const curr = splitters[i++];
+      if (typeof curr === 'number') return curr;
+    }
+    return source.statements.length;
+  }).forEach((index, i, arr) => (sections[SECTIONS[i]] = source.statements.slice(index, arr[i + 1])));
 
   return sections;
 };

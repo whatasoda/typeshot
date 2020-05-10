@@ -24,8 +24,8 @@ export const serializeEntry = (
   const content = printer.printNode(ts.EmitHint.Unspecified, resolved, dummySource);
   const declaration = `type ${name} = ${content};`;
   return String.raw(
-    ({ raw: template } as unknown) as TemplateStringsArray,
-    substitutions.map((symbol) => {
+    (Object.assign([...template], { raw: template }) as unknown) as TemplateStringsArray,
+    ...substitutions.map((symbol) => {
       switch (symbol) {
         case TemplateSymbols.NAME:
           return name;

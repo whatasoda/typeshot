@@ -11,6 +11,7 @@ const assertContext: (context: TypeshotContext | null) => asserts context is Typ
 
 namespace typeshot {
   export type T = any; // dynamic type parameter
+  export type Expand<T> = { [K in keyof T]: T[K] };
 
   export type TemplateSymbols = typeof TemplateSymbols[keyof typeof TemplateSymbols];
   export namespace TemplateSymbols {
@@ -143,4 +144,5 @@ const submitDynamic = <P>(
   });
 };
 
+(typeshot as any).default = typeshot;
 export = typeshot;

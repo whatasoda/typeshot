@@ -2,7 +2,12 @@ import ts from 'typescript';
 import prettier from 'prettier';
 import path from 'path';
 import { parseTypeEntriesFromStatements, splitStatements, COMMENT_NODES } from './parsers';
-import { createTypeshotStatementFromEntry, updateImportPath } from './ast-utils';
+import {
+  createTypeshotStatementFromEntry,
+  updateImportPath,
+  TypeshotImportDeclaration,
+  isTypeshotImportDeclaration,
+} from './ast-utils';
 import { serializeEntry } from './serialize';
 import type { ProgramConfig } from './decls';
 import runSourceWithContext from '../context';
@@ -81,12 +86,18 @@ const handlePreSource = (file: string, program: ts.Program, printer: ts.Printer)
   });
 
   const statements = context.entries.map(createTypeshotStatementFromEntry);
+  const hasTypeshotImport =
+    sections.OUTPUT_HEADER.some(isTypeshotImportDeclaration) ||
+    sections.HEADER.some(isTypeshotImportDeclaration) ||
+    sections.FOOTER.some(isTypeshotImportDeclaration) ||
+    sections.OUTPUT_FOOTER.some(isTypeshotImportDeclaration);
 
   const header = context.header || '';
   const content = printer.printFile(
     ts.updateSourceFileNode(
       source,
       ts.createNodeArray([
+        ...(hasTypeshotImport ? [] : [TypeshotImportDeclaration]),
         ...sections.OUTPUT_HEADER,
         ...sections.HEADER,
         COMMENT_NODES.MAIN,

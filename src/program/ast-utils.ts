@@ -153,3 +153,16 @@ export const updateImportPath = (statement: ts.Statement, relative: string) => {
   }
   return statement;
 };
+
+export const TypeshotImportDeclaration = ts.createImportDeclaration(
+  undefined,
+  undefined,
+  ts.createImportClause(ts.createIdentifier('typeshot'), undefined, false),
+  ts.createStringLiteral('typeshot'),
+);
+
+export const isTypeshotImportDeclaration = (node: ts.Node) => {
+  return (
+    ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text === 'typeshot'
+  );
+};
