@@ -20,7 +20,8 @@ namespace typeshot {
     export const DECLARATION = Symbol('typeshot:DECLARATION');
   }
 
-  export type PrimitiveParameter = number | string | boolean | undefined | null;
+  export type PrimitiveValue = number | string | boolean | undefined | null;
+  export type PrimitiveParameter = PrimitiveValue | PrimitiveValue[] | Record<string, PrimitiveValue>;
   export interface Config {
     output?: string;
   }
@@ -28,8 +29,9 @@ namespace typeshot {
   export type StaticWriter = (template: string[], ...substitutions: StaticSubtitution[]) => void;
   export type StaticSubtitution = TemplateSymbols;
 
-  export type TypeParameter = (PrimitiveParameter | PrimitiveParameter[])[] | ts.TypeNode;
-  export type ParameterFactory<P> = (props: P, ts: ASTFactories) => TypeParameter[];
+  export type TypeParameter = PrimitiveParameter[] | ts.TypeNode;
+  export type SingleParameterFactory<P> = (props: P, ts: ASTFactories) => TypeParameter;
+  export type MultipleParameterFactory<P> = (props: P, ts: ASTFactories) => TypeParameter[];
 
   export type NameDescriptor = string | Record<string, string> | string[];
   export type NameFactory<P> = (props: P) => NameDescriptor;
@@ -77,7 +79,7 @@ namespace typeshot {
     }
 
     return {
-      parameters: <P = {}>(parameterFactory: ParameterFactory<P>) => ({
+      parameters: <P = {}>(parameterFactory: MultipleParameterFactory<P> | SingleParameterFactory<P>[]) => ({
         names: (nameFactory: NameFactory<P>): DynamicWriter<P> => {
           let count = 0;
           return (rawTemplate, ...rawSubstitutions) => (props) => {
@@ -87,6 +89,8 @@ namespace typeshot {
       }),
     };
   };
+
+  export const createPrameter = <P, T extends PrimitiveParameter>(factory: (props: P) => T[]) => factory;
 
   export const configuration = (config: Config): ((...args: Parameters<typeof String.raw>) => void) => {
     const context = getCurrentContext();
@@ -112,12 +116,14 @@ const submitDynamic = <P>(
   context: TypeshotContext,
   info: TypeInformation,
   props: P,
-  parameterFactory: typeshot.ParameterFactory<P>,
+  parameterFactory: typeshot.MultipleParameterFactory<P> | typeshot.SingleParameterFactory<P>[],
   nameFactory: typeshot.NameFactory<P>,
   rawTemplate: TemplateStringsArray,
   rawSubstitutions: typeshot.DynamicSubtitution<P>[],
 ) => {
-  const parameters = parameterFactory(props, ASTFactories);
+  const parameters = Array.isArray(parameterFactory)
+    ? parameterFactory.map((factory) => factory(props, ASTFactories))
+    : parameterFactory(props, ASTFactories);
   const names = nameFactory(props);
 
   const template: string[] = [rawTemplate[0]];

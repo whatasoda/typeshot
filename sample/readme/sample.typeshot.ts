@@ -26,12 +26,14 @@ typeshot.takeStatic<EntryMap<Type>>('UniqueKey-1', 'TypeNameForEntryMap')`
 export ${typeshot.TemplateSymbols.DECLARATION}
 `;
 
+const stringParam = typeshot.createPrameter<DynamicTypeshotProps, string>(({ param }) => [param]);
+
 interface DynamicTypeshotProps {
   param: string;
 }
 const takeDynamic = typeshot
   .createDynamic<GenericType<typeshot.T>>('UniqueKey-2')
-  .parameters<DynamicTypeshotProps>(({ param }) => [[param]])
+  .parameters<DynamicTypeshotProps>([stringParam])
   .names(({ param }) => `GenericType__${param.toUpperCase()}`)`
 // ${({ param }) => param}
 export ${typeshot.TemplateSymbols.DECLARATION}

@@ -37,7 +37,7 @@ export const flattenCallLikeExpressionChain = (entry: ts.Expression) => {
   return result.reverse();
 };
 
-export const createTypeNodeFromPrimitiveParameter = (value: PrimitiveParameter | PrimitiveParameter[]): ts.TypeNode => {
+export const createTypeNodeFromPrimitiveParameter = (value: PrimitiveParameter, depth = 0): ts.TypeNode => {
   return value === null
     ? ts.createNull()
     : value === undefined
@@ -48,8 +48,20 @@ export const createTypeNodeFromPrimitiveParameter = (value: PrimitiveParameter |
     ? ts.createLiteralTypeNode(ts.createStringLiteral(value))
     : typeof value === 'number'
     ? ts.createLiteralTypeNode(ts.createNumericLiteral(`${value}`))
-    : Array.isArray(value)
-    ? ts.createTupleTypeNode(value.map(createTypeNodeFromPrimitiveParameter))
+    : typeof value === 'object' && depth === 0
+    ? Array.isArray(value)
+      ? ts.createTupleTypeNode(value.map((v) => createTypeNodeFromPrimitiveParameter(v, depth + 1)))
+      : ts.createTypeLiteralNode(
+          Object.entries(value).map(([k, v]) =>
+            ts.createPropertySignature(
+              undefined,
+              k,
+              undefined,
+              createTypeNodeFromPrimitiveParameter(v, depth + 1),
+              undefined,
+            ),
+          ),
+        )
     : ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
 };
 
