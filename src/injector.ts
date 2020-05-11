@@ -6,7 +6,7 @@ export const injectTypeParameters = (params: TypeParameter[], type: ts.TypeNode)
   const paramNodes = params.map<ts.TypeNode>((param) => {
     if (Array.isArray(param)) {
       if (param.length > 1) {
-        return ts.createUnionTypeNode(param.map(createTypeNodeFromPrimitiveParameter));
+        return ts.createUnionTypeNode(param.map((p) => createTypeNodeFromPrimitiveParameter(p)));
       } else {
         return createTypeNodeFromPrimitiveParameter(param[0] || ({} as any));
       }
