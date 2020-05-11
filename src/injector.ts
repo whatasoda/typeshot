@@ -5,7 +5,7 @@ import typeshot, { TypeParameter } from './typeshot';
 export const injectTypeParameters = (params: TypeParameter[], type: ts.TypeNode): ts.TypeNode => {
   const paramNodes = params.map<ts.TypeNode>((param) => {
     if (Array.isArray(param)) {
-      if (params.length > 1) {
+      if (param.length > 1) {
         return ts.createUnionTypeNode(param.map(createTypeNodeFromPrimitiveParameter));
       } else {
         return createTypeNodeFromPrimitiveParameter(param[0] || ({} as any));
