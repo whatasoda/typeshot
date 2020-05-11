@@ -49,9 +49,12 @@ export ${typeshot.TemplateSymbols.DECLARATION}
 interface DynamicTypeshotProps {
   param: string;
 }
+
+const stringParam = typeshot.createPrameter<DynamicTypeshotProps, string>(({ param }) => [param]);
+
 const takeDynamic = typeshot
   .createDynamic<GenericType<typeshot.T>>('UniqueKey-2')
-  .parameters<DynamicTypeshotProps>(({ param }) => [[param]])
+  .parameters<DynamicTypeshotProps>([stringParam])
   .names(({ param }) => `GenericType__${param.toUpperCase()}`)`
 // ${({ param }) => param}
 export ${typeshot.TemplateSymbols.DECLARATION}
@@ -170,9 +173,10 @@ The tail of statement, tagged template string is written in output after symbols
 interface DynamicTypeshotProps {
   param: string;
 }
+const stringParam = typeshot.createPrameter<DynamicTypeshotProps, string>(({ param }) => [param]);
 const takeDynamic = typeshot
   .createDynamic<GenericType<typeshot.T>>('UniqueKey')
-  .parameters<DynamicTypeshotProps>(({ param }) => [param])
+  .parameters<DynamicTypeshotProps>([stringParam])
   .names(({ param }) => param.toUpperCase())`
 // ${({ param }) => param}
 export ${typeshot.TemplateSymbols.DECLARATION}
@@ -185,7 +189,8 @@ takeDynamic({ param: 'bar' });
 The difference from `typeshot.takeStatic` is that the second argument doesn't exist, two extra phases `parameters` and `names` are added, `typeshot.T` is available in entry type, and function is available in tagged template.
 
 The `parameters` phase is for specifying replacement of `typeshot.T`.<br>
-You can use `typeshot.T` multiple times. The order that aliases are replaced is left to right, even if the entry type is deeply nested.
+You can use `typeshot.T` multiple times. The order that aliases are replaced is left to right, even if the entry type is deeply nested.<br>
+I recommend you to prepare type injection with `typeshot.createParameter`. It helps you to create injection with value typed correctly.
 
 The `name` phase is for specifying name of generated type.<br>
 You can use two kinds of name descriptors. One is to use string as same as the second argument of `takeStatic`.<br>
