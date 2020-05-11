@@ -33,7 +33,7 @@ interface DynamicSampleProps {
 
 const dynamicSample = typeshot
   .createDynamic<Pick<MappedType<SomeTypeMap>, typeshot.T /* this will be replaced */>>('sample' /* internal key */)
-  .parameters<DynamicSampleProps>(({ pick }) => [pick /* type parameter */])
+  .parameters<DynamicSampleProps>(({ pick }) => [[pick] /* type parameter */])
   .names(({ name }) => name)`
   // ${({ description }) => description}
   export ${typeshot.TemplateSymbols.DECLARATION}

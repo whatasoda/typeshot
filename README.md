@@ -2,11 +2,6 @@
 
 `typeshot` is a code generator like snapshot library, for TypeScript Declaration Files.
 
-## Motivation
-
-
-TypeScript developers have 
-
 ## Installation
 
 ```sh
@@ -56,7 +51,7 @@ interface DynamicTypeshotProps {
 }
 const takeDynamic = typeshot
   .createDynamic<GenericType<typeshot.T>>('UniqueKey-2')
-  .parameters<DynamicTypeshotProps>(({ param }) => [param])
+  .parameters<DynamicTypeshotProps>(({ param }) => [[param]])
   .names(({ param }) => `GenericType__${param.toUpperCase()}`)`
 // ${({ param }) => param}
 export ${typeshot.TemplateSymbols.DECLARATION}

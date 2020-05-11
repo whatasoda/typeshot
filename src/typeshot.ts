@@ -28,7 +28,7 @@ namespace typeshot {
   export type StaticWriter = (template: string[], ...substitutions: StaticSubtitution[]) => void;
   export type StaticSubtitution = TemplateSymbols;
 
-  export type TypeParameter = PrimitiveParameter | PrimitiveParameter[] | ts.TypeNode;
+  export type TypeParameter = (PrimitiveParameter | PrimitiveParameter[])[] | ts.TypeNode;
   export type ParameterFactory<P> = (props: P, ts: ASTFactories) => TypeParameter[];
 
   export type NameDescriptor = string | Record<string, string> | string[];

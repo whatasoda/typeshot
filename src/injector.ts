@@ -5,11 +5,15 @@ import typeshot, { TypeParameter } from './typeshot';
 export const injectTypeParameters = (params: TypeParameter[], type: ts.TypeNode): ts.TypeNode => {
   const paramNodes = params.map<ts.TypeNode>((param) => {
     if (Array.isArray(param)) {
-      return ts.createUnionTypeNode(param.map(createTypeNodeFromPrimitiveParameter));
+      if (params.length > 1) {
+        return ts.createUnionTypeNode(param.map(createTypeNodeFromPrimitiveParameter));
+      } else {
+        return createTypeNodeFromPrimitiveParameter(param[0] || ({} as any));
+      }
     } else if (typeof param === 'object' && param && ts.isTypeNode(param)) {
       return param;
     } else {
-      return createTypeNodeFromPrimitiveParameter(param);
+      return createTypeNodeFromPrimitiveParameter({} as any);
     }
   });
 
