@@ -91,7 +91,9 @@ export const createNameNode = (name: NameDescriptor) => {
 
 export const createTemplateExpression = ([head, ...template]: string[], substitutions: TemplateSymbols[]) => {
   const lastIndex = template.length - 1;
-  if (lastIndex) {
+  if (lastIndex === -1) {
+    return ts.createNoSubstitutionTemplateLiteral(head, head);
+  } else {
     return ts.createTemplateExpression(
       ts.createTemplateHead(head),
       template.map((text, index) => {
@@ -101,8 +103,6 @@ export const createTemplateExpression = ([head, ...template]: string[], substitu
         );
       }),
     );
-  } else {
-    return ts.createNoSubstitutionTemplateLiteral(head, head);
   }
 };
 
