@@ -19,6 +19,9 @@ export type Hoge = {
 };
 
 // hogehoge
+
+// Sample
+
 export type Sample = {
   hoge: {
     name: 'hoge';
@@ -27,6 +30,7 @@ export type Sample = {
 };
 
 // fuga
+
 export type Sample0 = {
   fuga: {
     name: 'fuga';

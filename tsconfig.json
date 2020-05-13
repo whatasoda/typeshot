@@ -30,6 +30,6 @@
       "typeshot": ["./src/typeshot.ts"]
     },
   },
-  "exclude": ["node_modules"],
+  "exclude": ["node_modules", "lib/**/*"],
   "include": ["**/*"],
 }

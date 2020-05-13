@@ -2,6 +2,7 @@ import ts from 'typescript';
 import { getCurrentContext, TypeshotContext } from './context';
 import { injectTypeParameters, applyNamesToTypeNode } from './injector';
 import { TypeInformation } from './program/decls';
+import { evaluateTaggedTemplate, flattenTaggedTemplate } from './tagged-template';
 
 const ASTFactories = ts;
 type ASTFactories = typeof ts;
@@ -27,7 +28,7 @@ namespace typeshot {
   }
 
   export type StaticWriter = (template: string[], ...substitutions: StaticSubtitution[]) => void;
-  export type StaticSubtitution = TemplateSymbols;
+  export type StaticSubtitution = string | TemplateSymbols;
 
   export type TypeParameter = PrimitiveParameter[] | ts.TypeNode;
   export type SingleParameterFactory<P> = (props: P, ts: ASTFactories) => TypeParameter;
@@ -36,15 +37,15 @@ namespace typeshot {
   export type NameDescriptor = string | Record<string, string> | string[];
   export type NameFactory<P> = (props: P) => NameDescriptor;
 
-  export type DynamicSubtitution<P> = ((props: P) => string) | TemplateSymbols;
+  export type DynamicSubtitution<P> = StaticSubtitution | ((props: P) => StaticSubtitution | DynamicSubtitution<P>[]);
   export type DynamicWriter<P> = (
     template: TemplateStringsArray,
     ...substitutions: DynamicSubtitution<P>[]
   ) => (props: P) => void;
 
   export const takeStatic = <_>(key: string, name: string) => (
-    template: TemplateStringsArray,
-    ...substitutions: TemplateSymbols[]
+    rawTemplate: TemplateStringsArray,
+    ...rawSubstitutions: TemplateSymbols[]
   ) => {
     const context = getCurrentContext();
     assertContext(context);
@@ -57,7 +58,8 @@ namespace typeshot {
       return;
     }
 
-    context.entries.push({ ...info, name, template: [...template], substitutions });
+    const [template, substitutions] = evaluateTaggedTemplate({}, rawTemplate, rawSubstitutions);
+    context.entries.push({ ...info, name, template, substitutions });
   };
 
   export const createDynamic = <_>(key: string) => {
@@ -91,6 +93,12 @@ namespace typeshot {
   };
 
   export const createPrameter = <P, T extends PrimitiveParameter>(factory: (props: P) => T[]) => factory;
+  export const createTemplate = <P>(
+    rawTemplate: TemplateStringsArray,
+    ...rawSubstitutions: DynamicSubtitution<P>[]
+  ) => {
+    return flattenTaggedTemplate(rawTemplate, rawSubstitutions);
+  };
 
   export const configuration = (config: Config): ((...args: Parameters<typeof String.raw>) => void) => {
     const context = getCurrentContext();
@@ -109,8 +117,6 @@ namespace typeshot {
   };
 }
 
-const TemplateSymbolList = Object.values(typeshot.TemplateSymbols);
-
 const submitDynamic = <P>(
   count: number,
   context: TypeshotContext,
@@ -126,17 +132,7 @@ const submitDynamic = <P>(
     : parameterFactory(props, ASTFactories);
   const names = nameFactory(props);
 
-  const template: string[] = [rawTemplate[0]];
-  const substitutions: typeshot.TemplateSymbols[] = [];
-  rawSubstitutions.forEach((curr, idx) => {
-    if (typeof curr === 'symbol' && TemplateSymbolList.includes(curr)) {
-      substitutions.push(curr);
-      template.push(rawTemplate[idx + 1]);
-      return;
-    }
-    if (typeof curr === 'function') template[substitutions.length] += curr(props);
-    template[substitutions.length] += rawTemplate[idx + 1];
-  });
+  const [template, substitutions] = evaluateTaggedTemplate(props, rawTemplate, rawSubstitutions);
 
   const injected = injectTypeParameters(parameters, info.type);
   const entryKey = `${info.key}-${count}`;

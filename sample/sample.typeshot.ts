@@ -31,11 +31,16 @@ interface DynamicSampleProps {
   pick: string;
 }
 
+const template = typeshot.createTemplate<DynamicSampleProps>`
+  // ${typeshot.TemplateSymbols.NAME}
+`;
+
 const dynamicSample = typeshot
   .createDynamic<Pick<MappedType<SomeTypeMap>, typeshot.T /* this will be replaced */>>('sample' /* internal key */)
   .parameters<DynamicSampleProps>(({ pick }) => [[pick] /* type parameter */])
   .names(({ name }) => name)`
   // ${({ description }) => description}
+  ${({ name }) => (name === 'Sample' ? template : [])}
   export ${typeshot.TemplateSymbols.DECLARATION}
 `;
 
