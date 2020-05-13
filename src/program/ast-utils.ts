@@ -139,17 +139,22 @@ export const getNameEntries = (names: NameDescriptor, type: ts.Type, checker: ts
   }
 };
 
-export const updateImportPath = (statement: ts.Statement, relative: string) => {
+const resolveRelativeImport = (modulePath: string, sourceDir: string, destinationDir: string) => {
+  if (!modulePath.startsWith('.')) return null;
+  const resolved = path.relative(path.parse(destinationDir).dir, path.resolve(sourceDir, modulePath));
+  return resolved.startsWith('.') ? resolved : `./${resolved}`;
+};
+
+export const updateImportPath = (statement: ts.Statement, sourceDir: string, destinationDir: string) => {
   if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
-    const curr = statement.moduleSpecifier.text;
-    if (curr.startsWith('.')) {
-      const next = path.resolve(relative, curr);
+    const modulePath = resolveRelativeImport(statement.moduleSpecifier.text, sourceDir, destinationDir);
+    if (modulePath) {
       return ts.updateImportDeclaration(
         statement,
         statement.decorators,
         statement.modifiers,
         statement.importClause,
-        ts.createStringLiteral(next),
+        ts.createStringLiteral(modulePath),
       );
     }
   } else if (
@@ -157,15 +162,14 @@ export const updateImportPath = (statement: ts.Statement, relative: string) => {
     ts.isExternalModuleReference(statement.moduleReference) &&
     ts.isStringLiteral(statement.moduleReference.expression)
   ) {
-    const curr = statement.moduleReference.expression.text;
-    if (curr.startsWith('.')) {
-      const next = path.resolve(relative, curr);
+    const modulePath = resolveRelativeImport(statement.moduleReference.expression.text, sourceDir, destinationDir);
+    if (modulePath) {
       return ts.updateImportEqualsDeclaration(
         statement,
         statement.decorators,
         statement.modifiers,
         statement.name,
-        ts.createExternalModuleReference(ts.createStringLiteral(next)),
+        ts.createExternalModuleReference(ts.createStringLiteral(modulePath)),
       );
     }
   }

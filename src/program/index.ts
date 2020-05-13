@@ -17,8 +17,9 @@ interface Relay {
   header: string;
   content: string;
   tempFilePath: string;
-  snapshotPath: string;
-  relativePath: string;
+  destination: string;
+  destinationDir: string;
+  sourceDir: string;
 }
 
 const runTypeshot = (typeshotConfig: ProgramConfig, sys: ts.System = ts.sys) => {
@@ -56,7 +57,7 @@ const runTypeshot = (typeshotConfig: ProgramConfig, sys: ts.System = ts.sys) => 
     const checker = program.getTypeChecker();
 
     relays.forEach((relay) => {
-      const { snapshotPath } = relay;
+      const { destination: snapshotPath } = relay;
       const content = handlePostSource(relay, program, checker, printer);
       if (!content) return;
       sys.writeFile(snapshotPath, prettier.format(content, { ...prettierOptions, parser: 'typescript' }));
@@ -67,15 +68,15 @@ const runTypeshot = (typeshotConfig: ProgramConfig, sys: ts.System = ts.sys) => 
   messages.forEach(console.log);
 };
 
-const handlePreSource = (file: string, program: ts.Program, printer: ts.Printer) => {
+const handlePreSource = (file: string, program: ts.Program, printer: ts.Printer): Relay | null => {
   const source = program.getSourceFile(file);
-  if (!source || source.isDeclarationFile) return;
+  if (!source || source.isDeclarationFile) return null;
   const sections = splitStatements(source);
   const typeEntries = parseTypeEntriesFromStatements(sections.MAIN);
   if (!typeEntries) {
     // eslint-disable-next-line no-console
     console.warn(`'${source.fileName}' has been skipped. Check usage of 'typeshot' in the file.`);
-    return;
+    return null;
   }
 
   const context = runSourceWithContext(source, program.getCompilerOptions(), {
@@ -110,20 +111,20 @@ const handlePreSource = (file: string, program: ts.Program, printer: ts.Printer)
   );
 
   const output = context.config?.output;
-  const { dir, name } = path.parse(file);
-  const tempFilePath = path.join(dir, `${name}.typeshot-tmp.ts`);
-  const snapshotPath = output
+  const { dir: sourceDir, name } = path.parse(file);
+  const tempFilePath = path.join(sourceDir, `${name}.typeshot-tmp.ts`);
+  const destination = output
     ? path.isAbsolute(output)
       ? output
-      : path.resolve(dir, output)
-    : path.join(dir, '__snapshot__', `${name}.snapshot`);
-  const relativePath = path.relative(snapshotPath, dir);
+      : path.resolve(sourceDir, output)
+    : path.join(sourceDir, '__snapshot__', `${name}.snapshot`);
+  const { dir: destinationDir } = path.parse(destination);
 
-  return { header, content, tempFilePath, snapshotPath, relativePath };
+  return { header, content, tempFilePath, destination, sourceDir, destinationDir };
 };
 
 const handlePostSource = (relay: Relay, program: ts.Program, checker: ts.TypeChecker, printer: ts.Printer) => {
-  const { header, relativePath, tempFilePath } = relay;
+  const { header, destinationDir, sourceDir, tempFilePath } = relay;
   const source = program.getSourceFile(tempFilePath);
   if (!source || source.isDeclarationFile) return;
 
@@ -146,13 +147,13 @@ const handlePostSource = (relay: Relay, program: ts.Program, checker: ts.TypeChe
     header,
     printer.printList(
       ts.ListFormat.None,
-      ts.createNodeArray(sections.OUTPUT_HEADER.map((s) => updateImportPath(s, relativePath))),
+      ts.createNodeArray(sections.OUTPUT_HEADER.map((s) => updateImportPath(s, sourceDir, destinationDir))),
       source,
     ),
     context.entries.map((entry) => serializeEntry(entry, checker, printer)).join(''),
     printer.printList(
       ts.ListFormat.None,
-      ts.createNodeArray(sections.OUTPUT_FOOTER.map((s) => updateImportPath(s, relativePath))),
+      ts.createNodeArray(sections.OUTPUT_FOOTER.map((s) => updateImportPath(s, sourceDir, destinationDir))),
       source,
     ),
     '\nexport {};\n',
