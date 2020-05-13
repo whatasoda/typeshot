@@ -91,15 +91,19 @@ export const createNameNode = (name: NameDescriptor) => {
 
 export const createTemplateExpression = ([head, ...template]: string[], substitutions: TemplateSymbols[]) => {
   const lastIndex = template.length - 1;
-  return ts.createTemplateExpression(
-    ts.createTemplateHead(head),
-    template.map((text, index) => {
-      return ts.createTemplateSpan(
-        createTemplateSymbolNode(substitutions[index]),
-        ts[index === lastIndex ? 'createTemplateTail' : 'createTemplateMiddle'](text),
-      );
-    }),
-  );
+  if (lastIndex) {
+    return ts.createTemplateExpression(
+      ts.createTemplateHead(head),
+      template.map((text, index) => {
+        return ts.createTemplateSpan(
+          createTemplateSymbolNode(substitutions[index]),
+          ts[index === lastIndex ? 'createTemplateTail' : 'createTemplateMiddle'](text),
+        );
+      }),
+    );
+  } else {
+    return ts.createNoSubstitutionTemplateLiteral(head, head);
+  }
 };
 
 const TemplateSymbolKeys = Object.keys(TemplateSymbols) as (keyof typeof TemplateSymbols)[];
