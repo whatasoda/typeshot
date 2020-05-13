@@ -34,7 +34,7 @@ export const evaluateTaggedTemplate = <P>(
     if (typeof curr === 'function') {
       const value = curr(props);
       if (Array.isArray(value)) {
-        stack.unshift(value);
+        stack.unshift([...value]);
         continue;
       } else {
         curr = value;
