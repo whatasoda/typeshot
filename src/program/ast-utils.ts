@@ -141,7 +141,7 @@ export const getNameEntries = (names: NameDescriptor, type: ts.Type, checker: ts
 
 const resolveRelativeImport = (modulePath: string, sourceDir: string, destinationDir: string) => {
   if (!modulePath.startsWith('.')) return null;
-  const resolved = path.relative(path.parse(destinationDir).dir, path.resolve(sourceDir, modulePath));
+  const resolved = path.relative(destinationDir, path.resolve(sourceDir, modulePath));
   return resolved.startsWith('.') ? resolved : `./${resolved}`;
 };
 
