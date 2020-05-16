@@ -2,62 +2,53 @@ import ts from 'typescript';
 import { flattenCallLikeExpressionChain } from './ast-utils';
 import type { TypeInformation } from './decls';
 
-const SECTIONS = ['OUTPUT_HEADER', 'HEADER', 'MAIN', 'FOOTER', 'OUTPUT_FOOTER'] as const;
 type OneOfSection = typeof SECTIONS[number];
 
-const SECTION_COMMENTS: Record<OneOfSection, string> = {
-  OUTPUT_HEADER: 'typeshot-output-header',
-  HEADER: 'typeshot-header',
-  MAIN: 'typeshot-main',
-  FOOTER: 'typeshot-footer',
-  OUTPUT_FOOTER: 'typeshot-output-footer',
-};
+const SECTIONS = ['output-header', 'header', 'main', 'footer', 'output-footer'] as const;
+const SECTION_COUNT = SECTIONS.length;
+const COMMENT_PATTERNS = SECTIONS.map((key) => new RegExp(`(^|\\s)typeshot-${key}(\\s|$)`));
 
-const COMMENT_PATTERNS = SECTIONS.reduce<Record<OneOfSection, RegExp>>((acc, key) => {
-  acc[key] = new RegExp(`(^|\\s)${SECTION_COMMENTS[key]}(\\s|$)`);
-  return acc;
-}, {} as any);
-
-export const COMMENT_NODES = SECTIONS.reduce<Record<OneOfSection, ts.EmptyStatement>>((acc, key) => {
+export const COMMENT_NODES = SECTIONS.reduce<Record<string, ts.EmptyStatement>>((acc, key) => {
   acc[key] = ts.addSyntheticLeadingComment(
     ts.createEmptyStatement(),
     ts.SyntaxKind.SingleLineCommentTrivia,
-    ` ${SECTION_COMMENTS[key]}`,
+    ` typeshot-${key}`,
     false,
   );
   return acc;
-}, {} as any);
+}, {}) as Record<OneOfSection, ts.EmptyStatement>;
 
 export const splitStatements = (source: ts.SourceFile) => {
-  const fileFullText = source.getFullText();
+  const fullText = source.getFullText();
+  const { statements } = source;
 
-  let pointer = -1;
-  const sections: Record<OneOfSection, ts.Statement[]> = {} as any;
-  const splitters: (number | undefined)[] = [];
-
-  source.statements.forEach(({ pos }, splitter) => {
+  let patterns = [...COMMENT_PATTERNS];
+  const sectionStartIndices = Array.from<number | null>({ length: SECTION_COUNT }).fill(null);
+  statements.forEach(({ pos }, index) => {
     // accepts only leading comments
-    const leadingRange = ts.getLeadingCommentRanges(fileFullText, pos);
-    leadingRange?.forEach((range) => {
-      if (!(range.kind & ts.SyntaxKind.SingleLineCommentTrivia)) return;
-      const comment = fileFullText.slice(range.pos + 2, range.end);
-      const start = pointer + 1;
-      const next = start + SECTIONS.slice(start).findIndex((key) => COMMENT_PATTERNS[key].test(comment));
-      if (next === pointer) return;
-      splitters[next] = splitter;
-      pointer = next;
+    ts.getLeadingCommentRanges(fullText, pos)?.forEach(({ kind, pos, end }) => {
+      if (!(kind & ts.SyntaxKind.SingleLineCommentTrivia)) return;
+      const comment = fullText.slice(pos + 2, end);
+      const curr = patterns.findIndex((pattern) => pattern.test(comment));
+      if (curr === -1) return;
+      sectionStartIndices[curr] = index;
+      patterns = patterns.slice(curr + 1);
     });
   });
 
-  SECTIONS.map((_, i) => {
-    while (i < SECTIONS.length) {
-      const curr = splitters[i++];
-      if (typeof curr === 'number') return curr;
+  // fill index of unused section
+  const nonnullableStatIndices = SECTIONS.map((_, i) => {
+    while (i < SECTION_COUNT) {
+      const start = sectionStartIndices[i++];
+      if (typeof start === 'number') return start;
     }
-    return source.statements.length;
-  }).forEach((index, i, arr) => (sections[SECTIONS[i]] = source.statements.slice(index, arr[i + 1])));
+    return statements.length;
+  });
 
-  return sections;
+  return nonnullableStatIndices.reduce<Record<string, ts.Statement[]>>((acc, start, i, { [i + 1]: end }) => {
+    acc[SECTIONS[i]] = statements.slice(start, end);
+    return acc;
+  }, {}) as Record<OneOfSection, ts.Statement[]>;
 };
 
 export const parsePreTypeEntries = (statements: ReadonlyArray<ts.Statement>) => {

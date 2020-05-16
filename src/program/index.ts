@@ -73,7 +73,7 @@ const handlePreSource = (
   if (source.isDeclarationFile) return null;
 
   const sections = splitStatements(source);
-  const types = parsePreTypeEntries(sections.MAIN);
+  const types = parsePreTypeEntries(sections['main']);
   if (!types) {
     // eslint-disable-next-line no-console
     console.warn(`'${source.fileName}' has been skipped. Check usage of 'typeshot' in the file.`);
@@ -81,19 +81,18 @@ const handlePreSource = (
   }
 
   const context = runSourceWithContext(source, options, { types, entries: [] });
-
   const statements = context.entries.map(createTypeshotStatementFromEntry);
 
   const contentText = printer.printFile(
     ts.updateSourceFileNode(
       source,
       ts.createNodeArray([
-        ...sections.OUTPUT_HEADER,
-        ...sections.HEADER,
-        COMMENT_NODES.MAIN,
+        ...sections['output-header'],
+        ...sections['header'],
+        COMMENT_NODES['main'],
         ...statements,
-        ...sections.FOOTER,
-        ...sections.OUTPUT_FOOTER,
+        ...sections['footer'],
+        ...sections['output-footer'],
       ]),
       false,
     ),
@@ -118,7 +117,7 @@ const handlePostSource = (relay: Relay, program: ts.Program, checker: ts.TypeChe
 
   const sections = splitStatements(source);
   const types = new Map<string, ts.TypeNode>();
-  sections.MAIN.forEach((stmt) => {
+  sections['main'].forEach((stmt) => {
     const entry = parseDefaultTypeshotExpression(stmt);
     if (entry) types.set(entry.key, entry.type);
   });
@@ -129,8 +128,8 @@ const handlePostSource = (relay: Relay, program: ts.Program, checker: ts.TypeChe
     return;
   }
 
-  const outputHeaders = sections.OUTPUT_HEADER.map((s) => updateImportPath(s, sourceDir, destinationDir));
-  const outputFooters = sections.OUTPUT_FOOTER.map((s) => updateImportPath(s, sourceDir, destinationDir));
+  const outputHeaders = sections['output-header'].map((s) => updateImportPath(s, sourceDir, destinationDir));
+  const outputFooters = sections['output-footer'].map((s) => updateImportPath(s, sourceDir, destinationDir));
 
   return [
     context.header || '',
