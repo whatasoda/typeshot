@@ -66,12 +66,6 @@ namespace typeshot {
     const context = getCurrentContext();
     assertContext(context);
 
-    if (context.mode === 'post') {
-      // eslint-disable-next-line no-console
-      console.warn("Something wrong happened! 'typeshot.createDynamic' should be removed in relay file.");
-      return { parameters: () => ({ names: () => () => () => {} }) };
-    }
-
     key = `dynamic:${key}`;
     const info = context.types[key];
     if (!info) {
@@ -103,12 +97,6 @@ namespace typeshot {
   export const configuration = (config: Config): ((...args: Parameters<typeof String.raw>) => void) => {
     const context = getCurrentContext();
     assertContext(context);
-
-    if (context.mode === 'post') {
-      // eslint-disable-next-line no-console
-      console.warn("Something wrong happened! 'typeshot.configuration' should be removed in relay file.");
-      return () => {};
-    }
 
     context.config = context.config || config;
     return (...args) => {

@@ -1,7 +1,7 @@
 import ts from 'typescript';
 import path from 'path';
 import type { TypeshotEntry } from './decls';
-import { TemplateSymbols, PrimitiveParameter, NameDescriptor } from '../typeshot';
+import { PrimitiveParameter, NameDescriptor } from '../typeshot';
 
 type CallLikeExpression = Exclude<
   ts.CallLikeExpression,
@@ -65,64 +65,10 @@ export const createTypeNodeFromPrimitiveParameter = (value: PrimitiveParameter, 
     : ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
 };
 
-export const createStringRecordNode = (record: Record<string, string>) => {
-  return ts.createObjectLiteral(
-    Object.entries(record).map(([name, text]) => {
-      return ts.createPropertyAssignment(name, ts.createStringLiteral(text));
-    }),
-  );
-};
-
-export const createStringArrayNode = (array: string[]) => {
-  return ts.createArrayLiteral(array.map((text) => ts.createStringLiteral(text)));
-};
-
-export const createNameNode = (name: NameDescriptor) => {
-  if (typeof name === 'string') {
-    return ts.createStringLiteral(name);
-  } else if (Array.isArray(name)) {
-    return createStringArrayNode(name);
-  } else if (typeof name === 'object' && name) {
-    return createStringRecordNode(name);
-  } else {
-    return ts.createNull();
-  }
-};
-
-export const createTemplateExpression = ([head, ...template]: string[], substitutions: TemplateSymbols[]) => {
-  const lastIndex = template.length - 1;
-  if (lastIndex === -1) {
-    return ts.createNoSubstitutionTemplateLiteral(head, head);
-  } else {
-    return ts.createTemplateExpression(
-      ts.createTemplateHead(head),
-      template.map((text, index) => {
-        return ts.createTemplateSpan(
-          createTemplateSymbolNode(substitutions[index]),
-          ts[index === lastIndex ? 'createTemplateTail' : 'createTemplateMiddle'](text),
-        );
-      }),
-    );
-  }
-};
-
-const TemplateSymbolKeys = Object.keys(TemplateSymbols) as (keyof typeof TemplateSymbols)[];
-export const createTemplateSymbolNode = (symbol: TemplateSymbols) => {
-  return ts.createPropertyAccess(
-    ts.createPropertyAccess(ts.createIdentifier('typeshot'), ts.createIdentifier('TemplateSymbols')),
-    ts.createIdentifier(TemplateSymbolKeys.find((name) => TemplateSymbols[name] === symbol) || ''),
-  );
-};
-
 export const createTypeshotStatementFromEntry = (entry: TypeshotEntry) => {
-  const tag = ts.createCall(
-    ts.createPropertyAccess(ts.createIdentifier('typeshot'), 'takeStatic'),
-    [entry.type],
-    [ts.createStringLiteral(entry.key), createNameNode(entry.name)],
+  return ts.createExpressionStatement(
+    ts.createCall(ts.createIdentifier('typeshot'), [entry.type], [ts.createStringLiteral(entry.key)]),
   );
-  const template = createTemplateExpression(entry.template, entry.substitutions);
-
-  return ts.createExpressionStatement(ts.createTaggedTemplate(tag, template));
 };
 
 export const getNameEntries = (names: NameDescriptor, type: ts.Type, checker: ts.TypeChecker): [string, ts.Type][] => {

@@ -60,7 +60,7 @@ export const splitStatements = (source: ts.SourceFile) => {
   return sections;
 };
 
-export const parseTypeEntriesFromStatements = (statements: ReadonlyArray<ts.Statement>) => {
+export const parsePreTypeEntries = (statements: ReadonlyArray<ts.Statement>) => {
   const entries: TypeInformation[] = [];
   statements.forEach((stmt) => {
     if (ts.isExpressionStatement(stmt)) {
@@ -147,4 +147,22 @@ export const parseTypeshotExpression = (entry: ts.Expression): TypeInformation |
   }
 
   return null;
+};
+
+export const parseDefaultTypeshotExpression = (statement: ts.Statement) => {
+  if (
+    !(
+      ts.isExpressionStatement(statement) &&
+      ts.isCallExpression(statement.expression) &&
+      statement.expression.expression.getText() === 'typeshot' &&
+      statement.expression.arguments.length === 1 &&
+      statement.expression.typeArguments?.length === 1
+    )
+  ) return null; // eslint-disable-line prettier/prettier
+
+  const [keyNode] = statement.expression.arguments;
+  const [type] = statement.expression.typeArguments;
+  if (!ts.isStringLiteral(keyNode)) return null;
+
+  return { key: keyNode.text, type };
 };

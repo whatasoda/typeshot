@@ -1,15 +1,10 @@
 // DO NOT EDIT - GENERATED FILE
 // typeshot-output-header
+// typeshot-output-header
 // eslint-disable-next-line no-console
 console.log('Loaded Generated File!');
 // Descriptions of 'TypeName'
-export type TypeName = {
-  foo: string;
-  bar: {
-    baz: number;
-    qux: Date;
-  };
-};
+export type TypeName = any;
 export type TypeNameArray = TypeName[];
 export const TypeName__sample: TypeName = {
   /* ... */

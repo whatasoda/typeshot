@@ -5,10 +5,8 @@ import type { Config } from './typeshot';
 import { Module } from 'module';
 
 export interface TypeshotContext {
-  readonly mode: 'pre' | 'post';
   readonly entries: TypeshotEntry[];
   readonly types: Record<string, TypeInformation>;
-  dynamicEntryCount: number;
   header?: string;
   config?: Config;
 }

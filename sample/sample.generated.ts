@@ -1,5 +1,6 @@
 // DO NOT EDIT - GENERATED FILE
 // typeshot-output-header
+// typeshot-output-header
 import type { Options } from 'prettier';
 interface SomeInterface {}
 type SomeType = {};
