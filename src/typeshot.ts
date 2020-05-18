@@ -43,31 +43,31 @@ namespace typeshot {
     ...substitutions: DynamicSubtitution<P>[]
   ) => (props: P) => void;
 
-  export const takeStatic = <_>(key: string, name: string) => (
+  const _takeStatic = <_>(name: string, key: string) => (
     rawTemplate: TemplateStringsArray,
     ...rawSubstitutions: TemplateSymbols[]
   ) => {
     const context = getCurrentContext();
     assertContext(context);
 
-    const entryKey = `static:${key}`;
-    const info = context.types[entryKey];
+    const info = context.types.get(key)!;
     if (!info) {
       // eslint-disable-next-line no-console
-      console.warn(`No correspond static type entry for '${entryKey}' found.`);
+      console.warn(`No correspond static type entry for '${key}' found.`);
       return;
     }
 
     const [template, substitutions] = evaluateTaggedTemplate({}, rawTemplate, rawSubstitutions);
     context.entries.push({ ...info, name, template, substitutions });
   };
+  // The key will auto matically injected.
+  export const takeStatic = _takeStatic as <_>(name: string) => ReturnType<typeof _takeStatic>;
 
-  export const createDynamic = <_>(key: string) => {
+  const _createDynamic = <_>(key: string) => {
     const context = getCurrentContext();
     assertContext(context);
 
-    key = `dynamic:${key}`;
-    const info = context.types[key];
+    const info = context.types.get(key);
     if (!info) {
       // eslint-disable-next-line no-console
       console.warn(`No correspond dynamic type entry for '${key}' found.`);
@@ -85,6 +85,7 @@ namespace typeshot {
       }),
     };
   };
+  export const createDynamic = _createDynamic as <_>() => ReturnType<typeof _createDynamic>;
 
   export const createPrameter = <P, T extends PrimitiveParameter>(factory: (props: P) => T[]) => factory;
   export const createTemplate = <P>(

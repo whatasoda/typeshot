@@ -1,9 +1,10 @@
 // DO NOT EDIT - GENERATED FILE
-// typeshot-output-header
-// typeshot-output-header
+
 import type { Options } from 'prettier';
 interface SomeInterface {}
 type SomeType = {};
+
+// typeshot-start
 export type Hoge = {
   hoge: {
     name: 'hoge';
@@ -48,7 +49,9 @@ export type FugaSelf = {
   name: 'fuga';
   value: SomeInterface;
 };
-// typeshot-output-footer
+
+// typeshot-end
 // eslint-disable-next-line no-console
 console.log();
+
 export {};

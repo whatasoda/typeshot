@@ -6,7 +6,7 @@ import { Module } from 'module';
 
 export interface TypeshotContext {
   readonly entries: TypeshotEntry[];
-  readonly types: Record<string, TypeInformation>;
+  readonly types: Map<string, TypeInformation>;
   header?: string;
   config?: Config;
 }
@@ -17,13 +17,14 @@ export const getCurrentContext = () => CURRENT_TYPESHOT_CONTEXT.current;
 
 const runSourceWithContext = (
   source: ts.SourceFile,
+  sourceText: string,
   options: ts.CompilerOptions,
   context: TypeshotContext,
 ): TypeshotContext => {
   const prev = CURRENT_TYPESHOT_CONTEXT.current;
   try {
+    const executableCode = ts.transpile(sourceText, options);
     const { fileName } = source;
-    const executableCode = ts.transpile(source.getFullText(), options);
 
     const MODULE = new Module(fileName, module);
     const pure = MODULE.require;

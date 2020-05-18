@@ -4,13 +4,11 @@ typeshot.configuration({ output: './sample.generated.ts' })`
 // DO NOT EDIT - GENERATED FILE
 `;
 
-// typeshot-output-header
 import type { Options } from 'prettier';
 interface SomeInterface {}
 type SomeType = {};
 
-// typeshot-header
-
+// typeshot-start
 interface SomeTypeMap {
   hoge: SomeType;
   fuga: SomeInterface;
@@ -20,8 +18,7 @@ type MappedType<T extends Record<string, any>> = {
   [K in keyof T]: { name: K; value: T[K] };
 };
 
-// typeshot-main
-typeshot.takeStatic<MappedType<SomeTypeMap> /* target type */>('Hoge' /* internal key */, 'Hoge' /* name */)`
+typeshot.takeStatic<MappedType<SomeTypeMap> /* target type */>('Hoge' /* name */)`
   export ${typeshot.TemplateSymbols.DECLARATION}
 `;
 
@@ -36,7 +33,7 @@ const template = typeshot.createTemplate<DynamicSampleProps>`
 `;
 
 const dynamicSample = typeshot
-  .createDynamic<Pick<MappedType<SomeTypeMap>, typeshot.T /* this will be replaced */>>('sample' /* internal key */)
+  .createDynamic<Pick<MappedType<SomeTypeMap>, typeshot.T /* this will be replaced */>>()
   .parameters<DynamicSampleProps>(({ pick }) => [[pick] /* type parameter */])
   .names(({ name }) => name)`
   // ${({ description }) => description}
@@ -52,7 +49,7 @@ interface DynamicSample2Props {
 }
 
 const dynamicSample2 = typeshot
-  .createDynamic<MappedType<SomeTypeMap>>('sample2' /* internal key */)
+  .createDynamic<MappedType<SomeTypeMap>>()
   .parameters<DynamicSample2Props>(() => [])
   .names(({ name }) => name)`
   export ${typeshot.TemplateSymbols.DECLARATION}
@@ -60,9 +57,8 @@ const dynamicSample2 = typeshot
 /* generate types of each properties */
 dynamicSample2({ name: { hoge: 'HogeSelf', fuga: 'FugaSelf' } });
 
-// typeshot-footer
 // eslint-disable-next-line no-console
 console.log();
-// typeshot-output-footer
+// typeshot-end
 // eslint-disable-next-line no-console
 console.log();

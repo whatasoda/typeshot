@@ -1,12 +1,14 @@
 import ts from 'typescript';
 import prettier from 'prettier';
 import path from 'path';
-import { parsePreTypeEntries, splitStatements, COMMENT_NODES, parseDefaultTypeshotExpression } from './parsers';
-import { createTypeshotStatementFromEntry, updateImportPath } from './ast-utils';
+import { parseTypeshotMethods, getModulePathNode } from './parsers';
+import { createIntermediateType, isTypeshotImportDeclaration } from './ast-utils';
 import { serializeEntry } from './serialize';
-import type { ProgramConfig } from './decls';
+import type { ProgramConfig, TypeInformation } from './decls';
 import runSourceWithContext, { TypeshotContext } from '../context';
 import '../typeshot';
+import { Replacement, transformSourceText } from './transform';
+import typeshot from '../typeshot';
 
 interface Relay {
   fileName: string;
@@ -72,31 +74,52 @@ const handlePreSource = (
   const source = ts.createSourceFile(fileName, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   if (source.isDeclarationFile) return null;
 
-  const sections = splitStatements(source);
-  const types = parsePreTypeEntries(sections['main']);
-  if (!types) {
+  const replaceOnExecution: Replacement[] = [];
+  const replaceOnIntermediate: Replacement[] = [];
+
+  let currKey = 0;
+
+  const keyInjectionIndex: Partial<Record<keyof typeof typeshot, number>> = {
+    createDynamic: 0,
+    takeStatic: 1,
+  };
+  const types = new Map<string, TypeInformation>();
+  source.statements.forEach((statement) => {
+    const parsed = parseTypeshotMethods(statement);
+    if (parsed) {
+      const { method, expression, typeArguments, arguments: args } = parsed;
+      replaceOnIntermediate[statement.pos] = { end: statement.end, text: '' };
+
+      if (method in keyInjectionIndex) {
+        const index = keyInjectionIndex[method]!;
+        if (args.length !== index) {
+          throw new Error(`Expected ${index} args, but got ${args.length}.`);
+        }
+
+        const pos = expression.end - 1;
+        const key = `${currKey++}`;
+        const [type] = typeArguments;
+        replaceOnExecution[pos] = { end: pos, text: `, '${key}'` };
+        types.set(key, { key, type });
+      }
+    } else if (isTypeshotImportDeclaration(statement)) {
+      replaceOnIntermediate[statement.pos] = { end: statement.end, text: '' };
+    }
+  });
+
+  if (!types.size) {
     // eslint-disable-next-line no-console
     console.warn(`'${source.fileName}' has been skipped. Check usage of 'typeshot' in the file.`);
     return null;
   }
 
-  const context = runSourceWithContext(source, options, { types, entries: [] });
-  const statements = context.entries.map(createTypeshotStatementFromEntry);
+  const codeToExecute = transformSourceText(sourceText, replaceOnExecution);
+  const context = runSourceWithContext(source, codeToExecute, options, { types, entries: [] });
 
-  const contentText = printer.printFile(
-    ts.updateSourceFileNode(
-      source,
-      ts.createNodeArray([
-        ...sections['output-header'],
-        ...sections['header'],
-        COMMENT_NODES['main'],
-        ...statements,
-        ...sections['footer'],
-        ...sections['output-footer'],
-      ]),
-      false,
-    ),
-  );
+  const intermediate = printer.printNode(ts.EmitHint.Unspecified, createIntermediateType(context.entries), source);
+
+  replaceOnIntermediate[sourceText.length] = { end: sourceText.length, text: `${intermediate}\n` };
+  const contentText = transformSourceText(sourceText, replaceOnIntermediate);
 
   const output = context.config?.output;
   const { dir: sourceDir, name } = path.parse(fileName);
@@ -109,18 +132,25 @@ const handlePreSource = (
 
   return { fileName, context, contentText, destination, sourceDir, destinationDir };
 };
+const START = /^\s*?\/\/ typeshot-start ?.*?$/m;
+const END = /^\s*?\/\/ typeshot-end ?.*?$/m;
 
 const handlePostSource = (relay: Relay, program: ts.Program, checker: ts.TypeChecker, printer: ts.Printer) => {
   const { fileName, context, destinationDir, sourceDir } = relay;
   const source = program.getSourceFile(fileName);
   if (!source || source.isDeclarationFile) return;
 
-  const sections = splitStatements(source);
+  const replaceOnOutput: Replacement[] = [{ end: 0, text: context.header ? `${context.header}\n` : '' }];
   const types = new Map<string, ts.TypeNode>();
-  sections['main'].forEach((stmt) => {
-    const entry = parseDefaultTypeshotExpression(stmt);
-    if (entry) types.set(entry.key, entry.type);
-  });
+  const last = source.statements[source.statements.length - 1];
+  if (ts.isInterfaceDeclaration(last) && last.name.text === '__TYPESHOT_INTERMEDIATE__') {
+    replaceOnOutput[last.pos] = { end: last.end, text: '' };
+    last.members.forEach((member) => {
+      if (ts.isPropertySignature(member) && ts.isStringLiteral(member.name) && member.type) {
+        types.set(member.name.text, member.type);
+      }
+    });
+  }
 
   if (!types.size) {
     // eslint-disable-next-line no-console
@@ -128,21 +158,41 @@ const handlePostSource = (relay: Relay, program: ts.Program, checker: ts.TypeChe
     return;
   }
 
-  const outputHeaders = sections['output-header'].map((s) => updateImportPath(s, sourceDir, destinationDir));
-  const outputFooters = sections['output-footer'].map((s) => updateImportPath(s, sourceDir, destinationDir));
+  const resolveRelativeImport = (modulePath: string) => {
+    if (!modulePath.startsWith('.')) return modulePath;
+    const resolved = path.relative(destinationDir, path.resolve(sourceDir, modulePath));
+    return resolved.startsWith('.') ? resolved : `./${resolved}`;
+  };
 
-  return [
-    context.header || '',
-    printer.printList(ts.ListFormat.None, ts.createNodeArray(outputHeaders), source),
-    context.entries
+  const fullText = source.getFullText();
+  const start = fullText.match(START);
+  const end = fullText.match(END);
+
+  replaceOnOutput[start && typeof start.index !== 'undefined' ? start.index + start[0].length : 0] = {
+    end: end && typeof end.index !== 'undefined' ? end.index - 1 : fullText.length,
+    text: context.entries
       .map((entry) => {
         const type = types.get(entry.key);
         return type ? serializeEntry({ ...entry, type }, checker, printer) : '';
       })
       .join(''),
-    printer.printList(ts.ListFormat.None, ts.createNodeArray(outputFooters), source),
-    '\nexport {};\n',
-  ].join('');
+  };
+  replaceOnOutput[fullText.length] = { end: fullText.length, text: '\nexport {};\n' };
+
+  const queue: ts.Node[] = [...source.statements];
+  while (queue.length) {
+    const node = queue.shift()!;
+    const modulePathNode = getModulePathNode(node);
+    if (modulePathNode) {
+      const pos = modulePathNode.end - modulePathNode.text.length - 1;
+      const end = modulePathNode.end - 1;
+      replaceOnOutput[pos] = { end, text: resolveRelativeImport };
+    }
+
+    node.forEachChild((child) => void queue.push(child));
+  }
+
+  return transformSourceText(fullText, replaceOnOutput);
 };
 
 const getPrettierOptions = (basePath: string, sys: ts.System) => {

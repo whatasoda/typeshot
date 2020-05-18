@@ -1,8 +1,13 @@
 // DO NOT EDIT - GENERATED FILE
-// typeshot-output-header
-// typeshot-output-header
+
 // eslint-disable-next-line no-console
 console.log('Loaded Generated File!');
+import '../another-file';
+// eslint-disable-next-line prettier/prettier
+export type a = import('../another-file').Type;
+export const a = import('../another-file');
+
+// typeshot-start
 // Descriptions of 'TypeName'
 export type TypeName = any;
 export type TypeNameArray = TypeName[];
@@ -34,5 +39,8 @@ export type GenericType__BAR = {
     type: 'bar';
   };
 };
+
+// typeshot-end
+'aa';
 
 export {};
