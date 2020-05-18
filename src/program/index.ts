@@ -50,7 +50,7 @@ const runTypeshot = (typeshotConfig: ProgramConfig, sys: ts.System = ts.sys) => 
     const readFile = host.readFile;
     host.readFile = (fileName: string) => Relays.get(fileName)?.contentText || readFile(fileName);
 
-    const program = ts.createProgram({ host, rootNames, options, projectReferences });
+    const program = ts.createProgram({ host, rootNames: tsconfig.fileNames, options, projectReferences });
     const checker = program.getTypeChecker();
 
     Relays.forEach((relay) => {
