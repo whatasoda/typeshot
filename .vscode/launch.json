@@ -11,14 +11,11 @@
         "node",
         "-r",
         // this is necessary if we want to use inspect command with ts-node
-        "ts-node/register",
+        "ts-node/register/transpile-only",
         // this makes the process hold until a debugger connected 9229
         "--inspect-brk=9229",
         "${workspaceFolder}/sample/init.ts"
       ],
-      "env": {
-        "TS_NODE_FILES": "true",
-      },
       // the debugger will try to to connect any debug agent on port 9229 
       "port": 9229,
       "skipFiles": [
