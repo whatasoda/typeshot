@@ -27,9 +27,6 @@ namespace typeshot {
     output?: string;
   }
 
-  export type StaticWriter = (template: string[], ...substitutions: StaticSubtitution[]) => void;
-  export type StaticSubtitution = string | TemplateSymbols;
-
   export type TypeParameter = PrimitiveParameter[] | ts.TypeNode;
   export type SingleParameterFactory<P> = (props: P, ts: ASTFactories) => TypeParameter;
   export type MultipleParameterFactory<P> = (props: P, ts: ASTFactories) => TypeParameter[];
@@ -37,16 +34,16 @@ namespace typeshot {
   export type NameDescriptor = string | Record<string, string> | string[];
   export type NameFactory<P> = (props: P) => NameDescriptor;
 
+  export type StaticSubtitution = string | TemplateSymbols;
+  export type StaticWriter = (template: TemplateStringsArray, ...substitutions: StaticSubtitution[]) => void;
+
   export type DynamicSubtitution<P> = StaticSubtitution | ((props: P) => StaticSubtitution | DynamicSubtitution<P>[]);
   export type DynamicWriter<P> = (
     template: TemplateStringsArray,
     ...substitutions: DynamicSubtitution<P>[]
   ) => (props: P) => void;
 
-  const _takeStatic = <_>(name: string, key: string) => (
-    rawTemplate: TemplateStringsArray,
-    ...rawSubstitutions: TemplateSymbols[]
-  ) => {
+  const _printStatic = <_>(name: string, key: string): StaticWriter => (rawTemplate, ...rawSubstitutions) => {
     const context = getCurrentContext();
     assertContext(context);
 
@@ -61,9 +58,12 @@ namespace typeshot {
     context.entries.push({ ...info, name, template, substitutions });
   };
   // The key will auto matically injected.
-  export const takeStatic = _takeStatic as <_>(name: string) => ReturnType<typeof _takeStatic>;
+  export const printStatic = _printStatic as <_>(name: string) => StaticWriter;
 
-  const _createDynamic = <_>(key: string) => {
+  const _createDynamic = <_, P = {}>(
+    parameterFactory: MultipleParameterFactory<P> | SingleParameterFactory<P>[],
+    key: string,
+  ) => {
     const context = getCurrentContext();
     assertContext(context);
 
@@ -74,18 +74,15 @@ namespace typeshot {
       return { parameters: () => ({ names: () => () => () => {} }) };
     }
 
-    return {
-      parameters: <P = {}>(parameterFactory: MultipleParameterFactory<P> | SingleParameterFactory<P>[]) => ({
-        names: (nameFactory: NameFactory<P>): DynamicWriter<P> => {
-          let count = 0;
-          return (rawTemplate, ...rawSubstitutions) => (props) => {
-            submitDynamic(count++, context, info, props, parameterFactory, nameFactory, rawTemplate, rawSubstitutions);
-          };
-        },
-      }),
+    let count = 0;
+    return (nameFactory: NameFactory<P>): DynamicWriter<P> => (rawTemplate, ...rawSubstitutions) => (props) => {
+      submitDynamic(count++, context, info, props, parameterFactory, nameFactory, rawTemplate, rawSubstitutions);
     };
   };
-  export const createDynamic = _createDynamic as <_>() => ReturnType<typeof _createDynamic>;
+  // The key will auto matically injected.
+  export const createDynamic = _createDynamic as <_, P = {}>(
+    parameterFactory: MultipleParameterFactory<P> | SingleParameterFactory<P>[],
+  ) => (nameFactory: NameFactory<P>) => DynamicWriter<P>;
 
   export const createPrameter = <P, T extends PrimitiveParameter>(factory: (props: P) => T[]) => factory;
   export const createTemplate = <P>(
@@ -135,5 +132,4 @@ const submitDynamic = <P>(
   });
 };
 
-(typeshot as any).default = typeshot;
 export = typeshot;

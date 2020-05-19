@@ -1,6 +1,4 @@
 import ts from 'typescript';
-import type { TypeshotEntry } from './decls';
-import { PrimitiveParameter } from '../typeshot';
 
 type CallLikeExpression = Exclude<
   ts.CallLikeExpression,
@@ -36,52 +34,12 @@ export const flattenCallLikeExpressionChain = (entry: ts.Expression) => {
   return result.reverse();
 };
 
-export const createTypeNodeFromPrimitiveParameter = (value: PrimitiveParameter, depth = 0): ts.TypeNode => {
-  return value === null
-    ? ts.createNull()
-    : value === undefined
-    ? ts.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
-    : typeof value === 'boolean'
-    ? ts.createLiteralTypeNode(ts.createLiteral(value))
-    : typeof value === 'string'
-    ? ts.createLiteralTypeNode(ts.createStringLiteral(value))
-    : typeof value === 'number'
-    ? ts.createLiteralTypeNode(ts.createNumericLiteral(`${value}`))
-    : typeof value === 'object' && depth === 0
-    ? Array.isArray(value)
-      ? ts.createTupleTypeNode(value.map((v) => createTypeNodeFromPrimitiveParameter(v, depth + 1)))
-      : ts.createTypeLiteralNode(
-          Object.entries(value).map(([k, v]) =>
-            ts.createPropertySignature(
-              undefined,
-              k,
-              undefined,
-              createTypeNodeFromPrimitiveParameter(v, depth + 1),
-              undefined,
-            ),
-          ),
-        )
-    : ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
-};
+export const forEachChildrenDeep = (root: ts.Node, callback: (node: ts.Node) => void) => {
+  const queue: ts.Node[] = [root];
 
-const INTERMEDIATE_TYPE_NAME = '__TYPESHOT_INTERMEDIATE__';
-export const createIntermediateType = (entries: TypeshotEntry[]) => {
-  return ts.createInterfaceDeclaration(
-    undefined,
-    [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
-    INTERMEDIATE_TYPE_NAME,
-    undefined,
-    undefined,
-    entries.map(({ key, type }) => {
-      return ts.createPropertySignature(undefined, ts.createStringLiteral(key), undefined, type, undefined);
-    }),
-  );
-};
-
-export const isTypeshotImportDeclaration = (statement: ts.Statement) => {
-  return (
-    ts.isImportDeclaration(statement) &&
-    ts.isStringLiteral(statement.moduleSpecifier) &&
-    statement.moduleSpecifier.text === 'typeshot'
-  );
+  while (queue.length) {
+    const node = queue.shift()!;
+    callback(node);
+    node.forEachChild((child) => void queue.push(child));
+  }
 };

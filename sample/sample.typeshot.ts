@@ -18,7 +18,7 @@ type MappedType<T extends Record<string, any>> = {
   [K in keyof T]: { name: K; value: T[K] };
 };
 
-typeshot.takeStatic<MappedType<SomeTypeMap> /* target type */>('Hoge' /* name */)`
+typeshot.printStatic<MappedType<SomeTypeMap> /* target type */>('Hoge' /* name */)`
   export ${typeshot.TemplateSymbols.DECLARATION}
 `;
 
@@ -32,30 +32,28 @@ const template = typeshot.createTemplate<DynamicSampleProps>`
   // ${typeshot.TemplateSymbols.NAME}
 `;
 
-const dynamicSample = typeshot
-  .createDynamic<Pick<MappedType<SomeTypeMap>, typeshot.T /* this will be replaced */>>()
-  .parameters<DynamicSampleProps>(({ pick }) => [[pick] /* type parameter */])
-  .names(({ name }) => name)`
+const pick = typeshot.createPrameter<DynamicSampleProps, string>(({ pick }) => [pick]);
+
+const dynamicSample = typeshot.createDynamic<Pick<MappedType<SomeTypeMap>, typeshot.T>, DynamicSampleProps>([pick]);
+const printDynamicSample = dynamicSample(({ name }) => name)`
   // ${({ description }) => description}
   ${({ name }) => (name === 'Sample' ? template : [])}
   export ${typeshot.TemplateSymbols.DECLARATION}
 `;
 
-dynamicSample({ name: 'Sample', description: 'hogehoge', pick: 'hoge' });
-dynamicSample({ name: 'Sample0', description: 'fuga', pick: 'fuga' });
+printDynamicSample({ name: 'Sample', description: 'hogehoge', pick: 'hoge' });
+printDynamicSample({ name: 'Sample0', description: 'fuga', pick: 'fuga' });
 
 interface DynamicSample2Props {
   name: typeshot.NameDescriptor;
 }
 
-const dynamicSample2 = typeshot
-  .createDynamic<MappedType<SomeTypeMap>>()
-  .parameters<DynamicSample2Props>(() => [])
-  .names(({ name }) => name)`
+const dynamicSample2 = typeshot.createDynamic<MappedType<SomeTypeMap>, DynamicSample2Props>([]);
+const printDynamicSample2 = dynamicSample2(({ name }) => name)`
   export ${typeshot.TemplateSymbols.DECLARATION}
 `;
 /* generate types of each properties */
-dynamicSample2({ name: { hoge: 'HogeSelf', fuga: 'FugaSelf' } });
+printDynamicSample2({ name: { hoge: 'HogeSelf', fuga: 'FugaSelf' } });
 
 // eslint-disable-next-line no-console
 console.log();

@@ -17,14 +17,14 @@ type EntryMap<T extends object> = {
   [K in keyof T]: readonly [K, T[K]];
 };
 
-typeshot.takeStatic<typeshot.Expand<Type>>('TypeName')`
+typeshot.printStatic<typeshot.Expand<Type>>('TypeName')`
 // Descriptions of '${typeshot.TemplateSymbols.NAME}'
 export ${typeshot.TemplateSymbols.DECLARATION}
 export type ${typeshot.TemplateSymbols.NAME}Array = ${typeshot.TemplateSymbols.NAME}[];
 export const ${typeshot.TemplateSymbols.NAME}__sample: ${typeshot.TemplateSymbols.NAME} = { /* ... */ } as any;
 `;
 
-typeshot.takeStatic<EntryMap<Type>>('TypeNameForEntryMap')`
+typeshot.printStatic<EntryMap<Type>>('TypeNameForEntryMap')`
 export ${typeshot.TemplateSymbols.DECLARATION}
 `;
 
@@ -33,15 +33,15 @@ const stringParam = typeshot.createPrameter<DynamicTypeshotProps, string>(({ par
 interface DynamicTypeshotProps {
   param: string;
 }
-const takeDynamic = typeshot
-  .createDynamic<GenericType<typeshot.T>>()
-  .parameters<DynamicTypeshotProps>([stringParam])
-  .names(({ param }) => `GenericType__${param.toUpperCase()}`)`
+
+const genericType = typeshot.createDynamic<GenericType<typeshot.T>, DynamicTypeshotProps>([stringParam]);
+
+const printGenericType = genericType(({ param }) => `GenericType__${param.toUpperCase()}`)`
 // ${({ param }) => param}
 export ${typeshot.TemplateSymbols.DECLARATION}
 `;
 
-takeDynamic({ param: 'foo' });
-takeDynamic({ param: 'bar' });
+printGenericType({ param: 'foo' });
+printGenericType({ param: 'bar' });
 // typeshot-end
 'aa';
