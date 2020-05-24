@@ -1,4 +1,5 @@
 # typeshot
+[![npm version](https://badge.fury.io/js/typeshot.svg)](https://badge.fury.io/js/typeshot)
 
 `typeshot` is a code generator like snapshot library, for TypeScript Declaration Files.
 
