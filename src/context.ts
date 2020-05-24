@@ -1,14 +1,25 @@
 import ts from 'typescript';
 import vm from 'vm';
-import type { TypeshotEntry, TypeInformation } from './program/decls';
-import type { Config } from './typeshot';
 import { Module } from 'module';
+import type { Config, TypeToken } from './typeshot';
 
 export interface TypeshotContext {
-  readonly entries: TypeshotEntry[];
-  readonly types: Map<string, TypeInformation>;
+  readonly getType: (id: string) => TypeInformation | undefined;
+  readonly requests: TypeRequest[];
+  readonly template: (string | TypeToken)[];
   header?: string;
   config?: Config;
+}
+
+export interface TypeInformation {
+  rootId: string;
+  type: ts.TypeNode;
+}
+
+export interface TypeRequest {
+  id: string;
+  type: ts.TypeNode;
+  property?: string | number;
 }
 
 const CURRENT_TYPESHOT_CONTEXT = { current: null as null | TypeshotContext };

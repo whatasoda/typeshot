@@ -1,19 +1,35 @@
 import ts from 'typescript';
-import type { TypeshotEntry } from '../decls';
 import type { AddReplecement } from '../transform';
+import { TypeRequest } from '../../context';
 
 const INTERMEDIATE_TYPE_NAME = '__TYPESHOT_INTERMEDIATE__';
-export const createIntermediateType = (entries: TypeshotEntry[]) => {
+export const createIntermediateType = (requests: TypeRequest[]) => {
   return ts.createInterfaceDeclaration(
     undefined,
     [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
     INTERMEDIATE_TYPE_NAME,
     undefined,
     undefined,
-    entries.map(({ key, type }) => {
-      return ts.createPropertySignature(undefined, ts.createStringLiteral(key), undefined, type, undefined);
+    requests.map(({ id, type, property }) => {
+      return ts.createPropertySignature(
+        undefined,
+        ts.createStringLiteral(id),
+        undefined,
+        applyPropertyAccess(type, property),
+        undefined,
+      );
     }),
   );
+};
+
+export const applyPropertyAccess = (type: ts.TypeNode, property: number | string | undefined) => {
+  if (typeof property === 'number') {
+    return ts.createIndexedAccessTypeNode(type, ts.createLiteralTypeNode(ts.createNumericLiteral(property.toString())));
+  }
+  if (typeof property === 'string') {
+    return ts.createIndexedAccessTypeNode(type, ts.createLiteralTypeNode(ts.createStringLiteral(property)));
+  }
+  return type;
 };
 
 export const parseIntermediateType = (statement: ts.Statement, replace: AddReplecement) => {

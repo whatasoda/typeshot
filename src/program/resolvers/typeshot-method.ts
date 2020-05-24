@@ -1,8 +1,8 @@
 import ts from 'typescript';
 import { flattenCallLikeExpressionChain } from '../ast-utils';
 import { AddReplecement } from '../transform';
-import { TypeInformation } from '../decls';
 import typeshot from '../../typeshot';
+import { TypeInformation } from '../../context';
 
 type OneOfMethodName = {
   [K in keyof typeof typeshot]: typeof typeshot[K] extends (...args: any[]) => any ? K : never;
@@ -59,10 +59,8 @@ const parseTypeshotMethods = (node: ts.Node): ParsedMethod | null => {
   return null;
 };
 
-const INJECTION_INDEX: Partial<Record<keyof typeof typeshot, number>> = {
-  createDynamic: 1,
-  printStatic: 1,
-};
+const ID_INJECTION_INDEX = 1;
+
 export const handleTypeshotMethod = (
   types: Map<string, TypeInformation>,
   node: ts.Node,
@@ -75,21 +73,20 @@ export const handleTypeshotMethod = (
   replaceOnIntermediateFile(node.pos, node.end, '');
   const { method, expression, typeArguments, arguments: args } = parsed;
 
-  if (method in INJECTION_INDEX) {
-    const index = INJECTION_INDEX[method]!;
-    if (args.length !== index) {
-      throw new Error(`Expected ${index} args, but got ${args.length}.`);
+  if (method === 'createType') {
+    if (args.length !== ID_INJECTION_INDEX) {
+      throw new Error(`Expected ${ID_INJECTION_INDEX} args, but got ${args.length}.`);
     }
 
-    const key = `${types.size}`;
+    const rootId = `${types.size}`;
     const [type] = typeArguments;
-    types.set(key, { key, type });
+    types.set(rootId, { rootId, type });
     if (args.length) {
       const pos = args[args.length - 1].end;
-      replaceOnExecution(pos, pos, `, '${key}'`);
+      replaceOnExecution(pos, pos, `, '${rootId}'`);
     } else {
       const pos = expression.end - 1;
-      replaceOnExecution(pos, pos, `, '${key}'`);
+      replaceOnExecution(pos, pos, `, '${rootId}'`);
     }
   }
 

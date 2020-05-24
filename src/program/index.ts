@@ -1,16 +1,15 @@
 import ts from 'typescript';
 import prettier from 'prettier';
 import path from 'path';
-import { serializeEntry } from './serialize';
-import type { TypeInformation } from './decls';
-import runSourceWithContext, { TypeshotContext } from '../context';
-import '../typeshot';
+import { serializeTemplate } from './serialize';
 import { createTransformHost } from './transform';
+import { getGenerationRange } from './separator';
+import { forEachChildrenDeep } from './ast-utils';
 import { handleTypeshotMethod } from './resolvers/typeshot-method';
 import { createIntermediateType, parseIntermediateType } from './resolvers/intermediate-type';
-import { getGenerationRange } from './separator';
 import { createModulePathResolver, isTypeshotImportDeclaration } from './resolvers/import-path';
-import { forEachChildrenDeep } from './ast-utils';
+import runSourceWithContext, { TypeshotContext, TypeInformation } from '../context';
+import '../typeshot';
 
 export interface ProgramConfig {
   test: RegExp;
@@ -108,9 +107,13 @@ const handleEntrypoint = (
   }
 
   const codeToExecute = createExecutableCode(sourceText);
-  const context = runSourceWithContext(source, codeToExecute, options, { types, entries: [] });
+  const context = runSourceWithContext(source, codeToExecute, options, {
+    getType: (id) => types.get(id),
+    template: [],
+    requests: [],
+  });
 
-  const intermediate = printer.printNode(ts.EmitHint.Unspecified, createIntermediateType(context.entries), source);
+  const intermediate = printer.printNode(ts.EmitHint.Unspecified, createIntermediateType(context.requests), source);
 
   replaceOnIntermediateFile(sourceText.length, sourceText.length, `${intermediate}\n`);
   const contentText = createIntermediateFile(sourceText);
@@ -135,8 +138,8 @@ const handleIntermediateFile = (relay: Relay, program: ts.Program, checker: ts.T
   const [replaceOnOutput, createOutput] = createTransformHost();
   if (context.header) replaceOnOutput(0, 0, `${context.header}\n`);
 
-  const types = parseIntermediateType(source.statements[source.statements.length - 1], replaceOnOutput);
-  if (!types.size) {
+  const intermediateTypes = parseIntermediateType(source.statements[source.statements.length - 1], replaceOnOutput);
+  if (!intermediateTypes.size) {
     // eslint-disable-next-line no-console
     console.warn(`'${source.fileName}' has been skipped. Check usage of 'typeshot' in the file.`);
     return;
@@ -145,11 +148,7 @@ const handleIntermediateFile = (relay: Relay, program: ts.Program, checker: ts.T
   const fullText = source.getFullText();
 
   const [start, end] = getGenerationRange(fullText);
-  const serializedTypes = context.entries.map((entry) => {
-    const type = types.get(entry.key);
-    return type ? serializeEntry({ ...entry, type }, checker, printer) : '';
-  });
-  replaceOnOutput(start, end, serializedTypes.join(''));
+  replaceOnOutput(start, end, serializeTemplate(context.template, intermediateTypes, checker, printer));
 
   const resolveModulePath = createModulePathResolver(replaceOnOutput, sourceDir, destinationDir);
   forEachChildrenDeep(source, (node) => {

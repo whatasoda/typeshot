@@ -1,46 +1,58 @@
 // DO NOT EDIT - GENERATED FILE
 
 // eslint-disable-next-line no-console
-console.log('Loaded Generated File!');
-import '../another-file';
-// eslint-disable-next-line prettier/prettier
-export type a = import('../another-file').Type;
-export const a = import('../another-file');
+console.log('Start Loading Generated File!');
 
 // typeshot-start
-// Descriptions of 'TypeName'
-export type TypeName = any;
-export type TypeNameArray = TypeName[];
-export const TypeName__sample: TypeName = {
-  /* ... */
-} as any;
-
-export type TypeNameForEntryMap = {
-  foo: readonly ['foo', string];
-  bar: readonly [
-    'bar',
-    {
-      baz: number;
-      qux: Date;
-    },
-  ];
+// You can write comments here.
+export type SampleType = {
+  foo: string;
+  bar: {
+    baz: number;
+    qux: Date;
+  };
 };
+export type SampleTypeArray = SampleType[];
+export const SampleType__sample = { foo: 'foo', bar: { baz: 0, qux: new Date() } } as any;
 
-// foo
-export type GenericType__FOO = {
+export type FooAlias = {
   foo: {
     type: 'foo';
   };
 };
+export interface FooInterface {
+  foo: {
+    type: 'foo';
+  };
+}
+export type Foo = {
+  fooo: {
+    foo: {
+      type: 'foo';
+    };
+  };
+};
 
-// bar
-export type GenericType__BAR = {
+export type BarAlias = {
   bar: {
     type: 'bar';
   };
 };
+export interface BarInterface {
+  bar: {
+    type: 'bar';
+  };
+}
+export type Bar = {
+  fooo: {
+    bar: {
+      type: 'bar';
+    };
+  };
+};
 
 // typeshot-end
-'aa';
+// eslint-disable-next-line no-console
+console.log('Finish Loading Generated File!');
 
 export {};

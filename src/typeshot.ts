@@ -1,8 +1,7 @@
 import ts from 'typescript';
 import { getCurrentContext, TypeshotContext } from './context';
-import { injectTypeParameters, applyNamesToTypeNode } from './injector';
-import { TypeInformation } from './program/decls';
-import { evaluateTaggedTemplate, flattenTaggedTemplate } from './tagged-template';
+import { injectTypeParameters } from './type-injection';
+import { evaluateTaggedTemplate } from './tagged-template';
 
 const ASTFactories = ts;
 type ASTFactories = typeof ts;
@@ -12,87 +11,150 @@ const assertContext: (context: TypeshotContext | null) => asserts context is Typ
 
 namespace typeshot {
   export type T = any; // dynamic type parameter
-  export type Expand<T> = { [K in keyof T]: T[K] };
 
-  export type TemplateSymbols = typeof TemplateSymbols[keyof typeof TemplateSymbols];
-  export namespace TemplateSymbols {
-    export const NAME = Symbol('typeshot:NAME');
-    export const CONTENT = Symbol('typeshot:CONTENT');
-    export const DECLARATION = Symbol('typeshot:DECLARATION');
+  export type Typeshot = typeof typeshot;
+  /*
+  
+  Parameter
+  
+  */
+  export type TypeParameter<T = any> =
+    | ParameterKind.Solo<T>
+    | ParameterKind.Union<T>
+    | ParameterKind.Intersection<T>
+    | ts.TypeNode;
+  export type SingleParameterFactory<P> = (props: P, ts: ASTFactories) => TypeParameter;
+  export type MultipleParameterFactory<P> = (props: P, ts: ASTFactories) => TypeParameter[];
+  export type ParameterFactory<P> = MultipleParameterFactory<P> | SingleParameterFactory<P>[];
+
+  export const solo = <T>(parameter: T) => new ParameterKind.Solo<T>(parameter);
+  export const union = <T>(parameter: T[]) => new ParameterKind.Union<T>(parameter);
+  export const intersection = <T>(parameter: T[]) => new ParameterKind.Intersection<T>(parameter);
+
+  export namespace ParameterKind {
+    export class Solo<T = any> {
+      constructor(public readonly param: T) {}
+    }
+    export class Union<T = any> {
+      constructor(public readonly param: T[]) {}
+    }
+    export class Intersection<T = any> {
+      constructor(public readonly param: T[]) {}
+    }
+  }
+  export const createPrameter = <T, P>(factory: (props: P, ts: ASTFactories) => TypeParameter<T>) => factory;
+
+  /*
+  
+  Type
+  
+  */
+  export type TypeToken = TokenObject<'alias'> | TokenObject<'interface'> | TokenObject<'literal'>;
+  export class TokenObject<T extends 'alias' | 'interface' | 'literal'> {
+    constructor(public readonly id: string, public readonly name: string, public readonly format: T) {}
+  }
+  export interface TypeTokenFactory<P> {
+    alias(name: string, props: P, property?: string | number): TypeToken;
+    interface(name: string, props: P, property?: string | number): TypeToken;
+    literal(props: P, property?: string | number): TypeToken;
+    named(name: string, property?: string | number): NamedTypeTokenFactory<P>;
+    mapArray(names: string[]): NamedTypeTokenFactory<P>[];
+    mapRecord<T extends string>(names: Record<T, string>): Record<T, NamedTypeTokenFactory<P>>;
+  }
+  export interface NamedTypeTokenFactory<P> {
+    readonly name: string;
+    alias(props: P): TokenObject<'alias'>;
+    interface(props: P): TokenObject<'interface'>;
+    literal(props: P): TokenObject<'literal'>;
   }
 
-  export type PrimitiveValue = number | string | boolean | undefined | null;
-  export type PrimitiveParameter = PrimitiveValue | PrimitiveValue[] | Record<string, PrimitiveValue>;
+  const _createType = <_, P = {}>(parameterFactory: ParameterFactory<P>, rootId: string): TypeTokenFactory<P> => {
+    const context = getCurrentContext();
+    assertContext(context);
+
+    const info = context.getType(rootId);
+    if (!info) throw new Error(`No correspond dynamic type entry for '${rootId}' found.`);
+
+    let count = 0;
+
+    const createToken = <T extends TypeToken['format']>(
+      format: T,
+      name: string,
+      props: P,
+      property?: string | number,
+    ): TokenObject<T> => {
+      const parameters = Array.isArray(parameterFactory)
+        ? parameterFactory.map((factory) => factory(props, ASTFactories))
+        : parameterFactory(props, ASTFactories);
+
+      const id = `${rootId}-${count++}`;
+      const type = injectTypeParameters(typeshot, parameters, info.type);
+      context.requests.push({ id, type, property });
+
+      return new TokenObject(id, name, format);
+    };
+
+    const named = (name: string, property?: string | number): NamedTypeTokenFactory<P> => ({
+      name,
+      alias: (props) => createToken('alias', name, props, property),
+      interface: (props) => createToken('interface', name, props, property),
+      literal: (props) => createToken('literal', name, props, property),
+    });
+
+    return {
+      alias: (...args) => createToken('alias', ...args),
+      interface: (...args) => createToken('interface', ...args),
+      literal: (...args) => createToken('literal', 'UNNAMED', ...args),
+      named,
+      mapArray: (names) => names.map(named),
+      mapRecord: (names) => {
+        return Object.keys(names).reduce<Record<string, NamedTypeTokenFactory<P>>>((acc, property) => {
+          acc[property] = named(names[property as keyof typeof names], property);
+          return acc;
+        }, {});
+      },
+    };
+  };
+  // The rootId will auto matically injected.
+  export const createType = _createType as <_, P = {}>(parameterFactory: ParameterFactory<P>) => TypeTokenFactory<P>;
+
+  /*
+  
+  Printer
+  
+  */
+  export type StaticSubtitution = string | number | boolean | undefined | null | TypeToken;
+  export type FunctionSubstitution<P> = (props: P) => StaticSubtitution | DynamicSubtitution<P>[];
+  export type DynamicSubtitution<P> = StaticSubtitution | FunctionSubstitution<P>;
+  export type ResolvedTemplate = string | TypeToken;
+
+  export const print = (template: TemplateStringsArray, ...substitutions: StaticSubtitution[]) => {
+    const context = getCurrentContext();
+    assertContext(context);
+    evaluateTaggedTemplate(template, substitutions, null, context.template);
+  };
+
+  export const createPrinter = <P>(template: TemplateStringsArray, ...substitutions: DynamicSubtitution<P>[]) => {
+    return (props: P) => {
+      const context = getCurrentContext();
+      assertContext(context);
+      evaluateTaggedTemplate(template, substitutions, props, context.template);
+    };
+  };
+
+  export const createTemplate = <P>(template: TemplateStringsArray, ...substitutions: DynamicSubtitution<P>[]) => {
+    return evaluateTaggedTemplate(template, substitutions, null, []);
+  };
+
+  /*
+  
+  Config
+  
+  */
   export interface Config {
     output?: string;
   }
-
-  export type TypeParameter = PrimitiveParameter[] | ts.TypeNode;
-  export type SingleParameterFactory<P> = (props: P, ts: ASTFactories) => TypeParameter;
-  export type MultipleParameterFactory<P> = (props: P, ts: ASTFactories) => TypeParameter[];
-
-  export type NameDescriptor = string | Record<string, string> | string[];
-  export type NameFactory<P> = (props: P) => NameDescriptor;
-
-  export type StaticSubtitution = string | TemplateSymbols;
-  export type StaticWriter = (template: TemplateStringsArray, ...substitutions: StaticSubtitution[]) => void;
-
-  export type DynamicSubtitution<P> = StaticSubtitution | ((props: P) => StaticSubtitution | DynamicSubtitution<P>[]);
-  export type DynamicWriter<P> = (
-    template: TemplateStringsArray,
-    ...substitutions: DynamicSubtitution<P>[]
-  ) => (props: P) => void;
-
-  const _printStatic = <_>(name: string, key: string): StaticWriter => (rawTemplate, ...rawSubstitutions) => {
-    const context = getCurrentContext();
-    assertContext(context);
-
-    const info = context.types.get(key)!;
-    if (!info) {
-      // eslint-disable-next-line no-console
-      console.warn(`No correspond static type entry for '${key}' found.`);
-      return;
-    }
-
-    const [template, substitutions] = evaluateTaggedTemplate({}, rawTemplate, rawSubstitutions);
-    context.entries.push({ ...info, name, template, substitutions });
-  };
-  // The key will auto matically injected.
-  export const printStatic = _printStatic as <_>(name: string) => StaticWriter;
-
-  const _createDynamic = <_, P = {}>(
-    parameterFactory: MultipleParameterFactory<P> | SingleParameterFactory<P>[],
-    key: string,
-  ) => {
-    const context = getCurrentContext();
-    assertContext(context);
-
-    const info = context.types.get(key);
-    if (!info) {
-      // eslint-disable-next-line no-console
-      console.warn(`No correspond dynamic type entry for '${key}' found.`);
-      return { parameters: () => ({ names: () => () => () => {} }) };
-    }
-
-    let count = 0;
-    return (nameFactory: NameFactory<P>): DynamicWriter<P> => (rawTemplate, ...rawSubstitutions) => (props) => {
-      submitDynamic(count++, context, info, props, parameterFactory, nameFactory, rawTemplate, rawSubstitutions);
-    };
-  };
-  // The key will auto matically injected.
-  export const createDynamic = _createDynamic as <_, P = {}>(
-    parameterFactory: MultipleParameterFactory<P> | SingleParameterFactory<P>[],
-  ) => (nameFactory: NameFactory<P>) => DynamicWriter<P>;
-
-  export const createPrameter = <P, T extends PrimitiveParameter>(factory: (props: P) => T[]) => factory;
-  export const createTemplate = <P>(
-    rawTemplate: TemplateStringsArray,
-    ...rawSubstitutions: DynamicSubtitution<P>[]
-  ) => {
-    return flattenTaggedTemplate(rawTemplate, rawSubstitutions);
-  };
-
-  export const configuration = (config: Config): ((...args: Parameters<typeof String.raw>) => void) => {
+  export const config = (config: Config): ((...args: Parameters<typeof String.raw>) => void) => {
     const context = getCurrentContext();
     assertContext(context);
 
@@ -102,34 +164,5 @@ namespace typeshot {
     };
   };
 }
-
-const submitDynamic = <P>(
-  count: number,
-  context: TypeshotContext,
-  info: TypeInformation,
-  props: P,
-  parameterFactory: typeshot.MultipleParameterFactory<P> | typeshot.SingleParameterFactory<P>[],
-  nameFactory: typeshot.NameFactory<P>,
-  rawTemplate: TemplateStringsArray,
-  rawSubstitutions: typeshot.DynamicSubtitution<P>[],
-) => {
-  const parameters = Array.isArray(parameterFactory)
-    ? parameterFactory.map((factory) => factory(props, ASTFactories))
-    : parameterFactory(props, ASTFactories);
-  const names = nameFactory(props);
-
-  const [template, substitutions] = evaluateTaggedTemplate(props, rawTemplate, rawSubstitutions);
-
-  const injected = injectTypeParameters(parameters, info.type);
-  const entryKey = `${info.key}-${count}`;
-  if (info.type === injected) {
-    // eslint-disable-next-line no-console
-    console.warn(`Nothing injected to '${entryKey}'.`);
-  }
-
-  applyNamesToTypeNode(names, injected).forEach(([name, type]) => {
-    context.entries.push({ key: `${entryKey}-${name}`, type, name, template, substitutions });
-  });
-};
 
 export = typeshot;
