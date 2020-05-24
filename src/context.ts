@@ -1,16 +1,25 @@
 import ts from 'typescript';
 import vm from 'vm';
-import type { TypeshotEntry, TypeInformation } from './program/decls';
-import type { Config } from './typeshot';
 import { Module } from 'module';
+import type { Config, TypeToken } from './typeshot';
 
 export interface TypeshotContext {
-  readonly mode: 'pre' | 'post';
-  readonly entries: TypeshotEntry[];
-  readonly types: Record<string, TypeInformation>;
-  dynamicEntryCount: number;
+  readonly getType: (id: string) => TypeInformation | undefined;
+  readonly requests: Map<string, TypeRequest>;
+  readonly template: (string | TypeToken)[];
   header?: string;
   config?: Config;
+}
+
+export interface TypeInformation {
+  rootId: string;
+  type: ts.TypeNode;
+}
+
+export interface TypeRequest {
+  id: string;
+  type: ts.TypeNode;
+  property?: string | number;
 }
 
 const CURRENT_TYPESHOT_CONTEXT = { current: null as null | TypeshotContext };
@@ -19,13 +28,14 @@ export const getCurrentContext = () => CURRENT_TYPESHOT_CONTEXT.current;
 
 const runSourceWithContext = (
   source: ts.SourceFile,
+  sourceText: string,
   options: ts.CompilerOptions,
   context: TypeshotContext,
 ): TypeshotContext => {
   const prev = CURRENT_TYPESHOT_CONTEXT.current;
   try {
+    const executableCode = ts.transpile(sourceText, options);
     const { fileName } = source;
-    const executableCode = ts.transpile(source.getFullText(), options);
 
     const MODULE = new Module(fileName, module);
     const pure = MODULE.require;

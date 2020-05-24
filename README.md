@@ -11,245 +11,92 @@ $ npm i -D typescript prettier ts-node # You can skip them if already installed.
 
 ## Usage
 
-### Example
+### `typeshot.createType<Target, Props>([...parameters])`
 
-#### `sample.typeshot.ts`
+This is the core API of `typeshot`. You can get TypeToken (token to print resolved type of `Target`).
 
-Register types that you want to take snapshot.
+When `Target` is a type reference and type arguments of the reference include the type `typeshot.T`, `typeshot.T` will be replaced with returned values type of given `parameters`. If there are multiple `typeshot.T`, they will be replaced from left to right. You can use `typeshot.T` in deeply nested type argument too.
 
+`parameters` is array of function that recieves props and returns a value of parameter you inject to `Target`. The value will be internally converted into appropriate AST(Abstract Syntax Tree) node so that you don't have to use TypeScript Compiler API. See `typeshot.createParameter` section about how to set up `parameters`.
+
+There are three kind of TypeToken (alias, interface and literal) and several approaches to get tokens.
 ```ts
-import typeshot from 'typeshot';
+const type = typeshot.createType<Target, Props>([...parameters]);
 
-typeshot.configuration({ output: './sample.generated.ts' })`
-// DO NOT EDIT - GENERATED FILE
-`;
-// typeshot-output-header
+typeshot.print`
+  // Target as type alias format, the name is 'TypeAsAlias'
+  export ${type(props).alias('TypeAsAlias')}
 
-// eslint-disable-next-line no-console
-console.log('Loaded Generated File!');
+  // Target as interface format, the name is 'TypeAsInterface'
+  export ${type(props).interface('TypeAsInterface')}
 
-// typeshot-header
-import type { Type, GenericType } from './another-file';
-type EntryMap<T extends object> = {
-  [K in keyof T]: readonly [K, T[K]];
-};
-
-// typeshot-main
-typeshot.takeStatic<typeshot.Expand<Type>>('UniqueKey-0', 'TypeName')`
-// Descriptions of '${typeshot.TemplateSymbols.NAME}'
-export ${typeshot.TemplateSymbols.DECLARATION}
-export type ${typeshot.TemplateSymbols.NAME}Array = ${typeshot.TemplateSymbols.NAME}[];
-export const ${typeshot.TemplateSymbols.NAME}__sample: ${typeshot.TemplateSymbols.NAME} = { /* ... */ } as any;
+  // Target as type literal format, you cannot name it since it's type literal
+  export type TypeAsLiteral = ${type(props).literal()};
 `;
 
-typeshot.takeStatic<EntryMap<Type>>('UniqueKey-1', 'TypeNameForEntryMap')`
-export ${typeshot.TemplateSymbols.DECLARATION}
+const [First, Second, Third] = type(props).mapArray(['First', 'Second', 'Third']);
+typeshot.print`
+  // Target[0] as type alias format, the name is 'First'
+  export ${First.alias}
+
+  // Target[1] as interface format, the name is 'Second'
+  export ${Second.interface}
+
+  // Target[2] as type literal format, the named is 'Third' but ignored since the format is literal
+  export type Third = ${Third.literal};
 `;
+console.log(First.property, First.name); // 0, 'First'
+console.log(Second.property, Second.name); // 1, 'Second'
+console.log(Third.property, Third.name); // 2, 'Third'
 
-interface DynamicTypeshotProps {
-  param: string;
-}
+const { foo, bar, baz } = type(props).mapRecord({ foo: 'Foo', bar: 'Bar', baz: 'Baz' });
+typeshot.print`
+  // Target['foo'] as type alias format, the name is 'Foo'
+  export ${foo.alias}
 
-const stringParam = typeshot.createPrameter<DynamicTypeshotProps, string>(({ param }) => [param]);
+  // Target['bar'] as interface format, the name is 'Bar'
+  export ${bar.interface}
 
-const takeDynamic = typeshot
-  .createDynamic<GenericType<typeshot.T>>('UniqueKey-2')
-  .parameters<DynamicTypeshotProps>([stringParam])
-  .names(({ param }) => `GenericType__${param.toUpperCase()}`)`
-// ${({ param }) => param}
-export ${typeshot.TemplateSymbols.DECLARATION}
+  // Target['baz'] as type literal format, the named is 'Baz' but ignored since the format is literal
+  export type Baz = ${baz.literal};
 `;
-
-takeDynamic({ param: 'foo' });
-takeDynamic({ param: 'bar' });
+console.log(foo.property, foo.name); // 0, 'Foo'
+console.log(bar.property, bar.name); // 1, 'Bar'
+console.log(baz.property, baz.name); // 2, 'Baz'
 ```
 
-#### `another-file.ts`
+Please use it as `typeshot.createType` not `createType` in order to parse and inject needed values.
 
-This is dependency file that is loaded from `sample.typeshot.ts`.
+### `typeshot.createParameter<Parameter, Props>((props: P) => { ... })`
 
-```ts
-export interface Type {
-  foo: string;
-  bar: {
-    baz: number;
-    qux: Date;
-  };
-}
+This helps to set up parameter function for the sake of `typeshot.createType`. The value of parameter have to be wrapped by `typeshot.solo`, `typeshot.union`, or `typeshot.intersection`. As their name, you can create Union Type and Intersection Type with `union` and `intersection`. `solo` is for single type.
 
-export type GenericType<T extends string> = {
-  [K in T]: { type: K };
-};
-```
+### `typeshot.print`
 
-#### run-typeshot.ts
-There is no CLI for `typeshot` yet.
-```ts
-import runTypeshot from 'typeshot/program';
+This accumulates output contents immediately. You can use Type Token but a function.
 
-runTypeshot({ test: /\.typeshot\.ts$/ });
-```
+### `typeshot.createPrinter<Props>`
+This returns a printer function to accumulate output contents. You can use a function in template substitutions.
 
-Execute via `ts-node`
+### `typeshot.createTemplate<Props>`
+WIP
 
-```sh
-$ ts-node --files run-typeshot.ts
-```
+### `// typeshot-start` and `// typeshot-end` Comments
 
-#### `sample.generated.ts`
+Lines before `// typeshot-start` and lines after `// typeshot-end` are kept in output file. Both are optional so that you can skip it.
 
-This is the output file of `typeshot` with `sample.typeshot.ts`.
+Some types or values should still necessary in the output file. You can write such code by using these comments.
 
-```ts
-// DO NOT EDIT - GENERATED FILE
-// typeshot-output-header
-// eslint-disable-next-line no-console
-console.log('Loaded Generated File!');
-// Descriptions of 'TypeName'
-export type TypeName = {
-  foo: string;
-  bar: {
-    baz: number;
-    qux: Date;
-  };
-};
-export type TypeNameArray = TypeName[];
-export const TypeName__sample: TypeName = {
-  /* ... */
-} as any;
-
-export type TypeNameForEntryMap = {
-  foo: readonly ['foo', string];
-  bar: readonly [
-    'bar',
-    {
-      baz: number;
-      qux: Date;
-    },
-  ];
-};
-
-// foo
-export type GenericType__FOO = {
-  foo: {
-    type: 'foo';
-  };
-};
-
-// bar
-export type GenericType__BAR = {
-  bar: {
-    type: 'bar';
-  };
-};
-
-export {};
-```
-
-### API
-
-#### `typeshot.takeStatic`
-
-This is the most basic usage of `typeshot`. You can take a snapshot of type.
-
-```ts
-typeshot.takeStatic<SnapshotEntryType>('Unique Key', 'TypeName')`
-// output code as string
-${typeshot.TemplateSymbols.NAME}
-${typeshot.TemplateSymbols.CONTENT}
-${typeshot.TemplateSymbols.DECLARATION}
-`;
-```
-The type parameter at where `SnapshotEntryType` is placed, is the entry. `typeshot` serialize actual type structure of the entry.
-
-The first argument is a key as pure string literal, don't use template string. Each key should be unique in the file.
-
-The second argument is name of generated type.
-
-The tail of statement, tagged template string is written in output after symbols are replaced with generated type. It is described later section about symbols.
-
-#### `typeshot.createDynamic`
-```ts
-interface DynamicTypeshotProps {
-  param: string;
-}
-const stringParam = typeshot.createPrameter<DynamicTypeshotProps, string>(({ param }) => [param]);
-const takeDynamic = typeshot
-  .createDynamic<GenericType<typeshot.T>>('UniqueKey')
-  .parameters<DynamicTypeshotProps>([stringParam])
-  .names(({ param }) => param.toUpperCase())`
-// ${({ param }) => param}
-export ${typeshot.TemplateSymbols.DECLARATION}
-`;
-
-takeDynamic({ param: 'foo' });
-takeDynamic({ param: 'bar' });
-```
-
-The difference from `typeshot.takeStatic` is that the second argument doesn't exist, two extra phases `parameters` and `names` are added, `typeshot.T` is available in entry type, and function is available in tagged template.
-
-The `parameters` phase is for specifying replacement of `typeshot.T`.<br>
-You can use `typeshot.T` multiple times. The order that aliases are replaced is left to right, even if the entry type is deeply nested.<br>
-I recommend you to prepare type injection with `typeshot.createParameter`. It helps you to create injection with value typed correctly.
-
-The `name` phase is for specifying name of generated type.<br>
-You can use two kinds of name descriptors. One is to use string as same as the second argument of `takeStatic`.<br>
-Another one is object(`Record<string, string>`) or array(`string[]`). When you use this way, the generated type is not entry type itself. `typeshot` use each type of property that is referred with keys of the object or array, and value of the key will be used as name.
-
-As the example, you can use function in the tagged template.
-
-You can set the type of argument of each function in the type parameter of `parameters` phase.
-
-#### `typeshot.configuration`
+### `typeshot.config`
 
 You can specify path of output file and header content of output file.
 
 ```ts
-typeshot.configuration({ output: './sample.generated.ts' })`
+typeshot.config({ output: './sample.generated.ts' })`
 // DO NOT EDIT - GENERATED FILE
 `;
 ```
 
-#### Symbols
-| group           | name        | description |
-|:--------------- |:----------- |:----------- |
-|`TemplateSymbols`|`NAME`       | name of output type |
-|                 |`CONTENT`    | content of output type, generally object literal |
-|                 |`DECLARATION`| completed content of output type, as type alias |
-
-#### Types
-| name            | description |
-|:--------------- |:----------- |
-|`typeshot.T`     | Type alias that will be replaced by dynamic parameter. See `typeshot.createDynamic` section about detail. |
-|`typeshot.Expand`| Generic type that helps to serialize types declared as `interface`.<br> For example, if `Type` in the example above was not wrapped with `typeshot.Expand`, it is serialized to `Type`, not object literal. |
-
-### Section Comments
-
-`typeshot` splits input file into several sections by spesific comments. Supports only single line comment.
-```ts
-console.log('unknown, will be ignored');
-
-// section-comment-A
-console.log('section A start');
-/* statements */
-console.log('section A end');
-
-// section-comment-B
-console.log('section B start');
-/* statements */
-console.log('section B end');
-```
-
-Statements in each section are treated in different way.
-
-| section name           | kept or not in output | what kind of code should be written |
-|:---------------------- |:--------------------- |:----------------------------------- |
-|before sections         | removed               | used by also generated code (**transformed** `main`) |
-|`typeshot-output-header`| kept on the top       | used by also generated code (**transformed** `main`) |
-|`typeshot-header`       | removed               | used by only **raw** `main` section |
-|`typeshot-main`         | removed               | `typeshot`'s code |
-|`typeshot-footer`       | removed               | used by only **raw** `main` section |
-|`typeshot-output-footer`| kept on the bottom    | used by also generated code (**transformed** `main`) |
 
 
 ### Execution
@@ -265,7 +112,7 @@ runTypeshot({ test: /\.typeshot\.ts$/ });
 ```
 
 ```sh
-$ ts-node --files run-typeshot.ts
+$ ts-node-transpile-only run-typeshot.ts
 ```
 
 #### Options

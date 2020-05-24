@@ -1,7 +1,4 @@
 import ts from 'typescript';
-import path from 'path';
-import type { TypeshotEntry } from './decls';
-import { TemplateSymbols, PrimitiveParameter, NameDescriptor } from '../typeshot';
 
 type CallLikeExpression = Exclude<
   ts.CallLikeExpression,
@@ -37,154 +34,12 @@ export const flattenCallLikeExpressionChain = (entry: ts.Expression) => {
   return result.reverse();
 };
 
-export const createTypeNodeFromPrimitiveParameter = (value: PrimitiveParameter, depth = 0): ts.TypeNode => {
-  return value === null
-    ? ts.createNull()
-    : value === undefined
-    ? ts.createKeywordTypeNode(ts.SyntaxKind.UndefinedKeyword)
-    : typeof value === 'boolean'
-    ? ts.createLiteralTypeNode(ts.createLiteral(value))
-    : typeof value === 'string'
-    ? ts.createLiteralTypeNode(ts.createStringLiteral(value))
-    : typeof value === 'number'
-    ? ts.createLiteralTypeNode(ts.createNumericLiteral(`${value}`))
-    : typeof value === 'object' && depth === 0
-    ? Array.isArray(value)
-      ? ts.createTupleTypeNode(value.map((v) => createTypeNodeFromPrimitiveParameter(v, depth + 1)))
-      : ts.createTypeLiteralNode(
-          Object.entries(value).map(([k, v]) =>
-            ts.createPropertySignature(
-              undefined,
-              k,
-              undefined,
-              createTypeNodeFromPrimitiveParameter(v, depth + 1),
-              undefined,
-            ),
-          ),
-        )
-    : ts.createKeywordTypeNode(ts.SyntaxKind.UnknownKeyword);
-};
+export const forEachChildrenDeep = (root: ts.Node, callback: (node: ts.Node) => void) => {
+  const queue: ts.Node[] = [root];
 
-export const createStringRecordNode = (record: Record<string, string>) => {
-  return ts.createObjectLiteral(
-    Object.entries(record).map(([name, text]) => {
-      return ts.createPropertyAssignment(name, ts.createStringLiteral(text));
-    }),
-  );
-};
-
-export const createStringArrayNode = (array: string[]) => {
-  return ts.createArrayLiteral(array.map((text) => ts.createStringLiteral(text)));
-};
-
-export const createNameNode = (name: NameDescriptor) => {
-  if (typeof name === 'string') {
-    return ts.createStringLiteral(name);
-  } else if (Array.isArray(name)) {
-    return createStringArrayNode(name);
-  } else if (typeof name === 'object' && name) {
-    return createStringRecordNode(name);
-  } else {
-    return ts.createNull();
+  while (queue.length) {
+    const node = queue.shift()!;
+    callback(node);
+    node.forEachChild((child) => void queue.push(child));
   }
-};
-
-export const createTemplateExpression = ([head, ...template]: string[], substitutions: TemplateSymbols[]) => {
-  const lastIndex = template.length - 1;
-  if (lastIndex === -1) {
-    return ts.createNoSubstitutionTemplateLiteral(head, head);
-  } else {
-    return ts.createTemplateExpression(
-      ts.createTemplateHead(head),
-      template.map((text, index) => {
-        return ts.createTemplateSpan(
-          createTemplateSymbolNode(substitutions[index]),
-          ts[index === lastIndex ? 'createTemplateTail' : 'createTemplateMiddle'](text),
-        );
-      }),
-    );
-  }
-};
-
-const TemplateSymbolKeys = Object.keys(TemplateSymbols) as (keyof typeof TemplateSymbols)[];
-export const createTemplateSymbolNode = (symbol: TemplateSymbols) => {
-  return ts.createPropertyAccess(
-    ts.createPropertyAccess(ts.createIdentifier('typeshot'), ts.createIdentifier('TemplateSymbols')),
-    ts.createIdentifier(TemplateSymbolKeys.find((name) => TemplateSymbols[name] === symbol) || ''),
-  );
-};
-
-export const createTypeshotStatementFromEntry = (entry: TypeshotEntry) => {
-  const tag = ts.createCall(
-    ts.createPropertyAccess(ts.createIdentifier('typeshot'), 'takeStatic'),
-    [entry.type],
-    [ts.createStringLiteral(entry.key), createNameNode(entry.name)],
-  );
-  const template = createTemplateExpression(entry.template, entry.substitutions);
-
-  return ts.createExpressionStatement(ts.createTaggedTemplate(tag, template));
-};
-
-export const getNameEntries = (names: NameDescriptor, type: ts.Type, checker: ts.TypeChecker): [string, ts.Type][] => {
-  if (typeof names === 'string') {
-    return [[names, type]];
-  } else if (typeof names === 'object' && names) {
-    return Object.entries(names).reduce<[string, ts.Type][]>((acc, [key, name]) => {
-      const property = checker.getPropertyOfType(type, key) as (ts.Symbol & Partial<ts.IncompleteType>) | undefined;
-      if (property?.type) acc.push([name, property.type]);
-      return acc;
-    }, []);
-  } else {
-    return [];
-  }
-};
-
-const resolveRelativeImport = (modulePath: string, sourceDir: string, destinationDir: string) => {
-  if (!modulePath.startsWith('.')) return null;
-  const resolved = path.relative(destinationDir, path.resolve(sourceDir, modulePath));
-  return resolved.startsWith('.') ? resolved : `./${resolved}`;
-};
-
-export const updateImportPath = (statement: ts.Statement, sourceDir: string, destinationDir: string) => {
-  if (ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier)) {
-    const modulePath = resolveRelativeImport(statement.moduleSpecifier.text, sourceDir, destinationDir);
-    if (modulePath) {
-      return ts.updateImportDeclaration(
-        statement,
-        statement.decorators,
-        statement.modifiers,
-        statement.importClause,
-        ts.createStringLiteral(modulePath),
-      );
-    }
-  } else if (
-    ts.isImportEqualsDeclaration(statement) &&
-    ts.isExternalModuleReference(statement.moduleReference) &&
-    ts.isStringLiteral(statement.moduleReference.expression)
-  ) {
-    const modulePath = resolveRelativeImport(statement.moduleReference.expression.text, sourceDir, destinationDir);
-    if (modulePath) {
-      return ts.updateImportEqualsDeclaration(
-        statement,
-        statement.decorators,
-        statement.modifiers,
-        statement.name,
-        ts.createExternalModuleReference(ts.createStringLiteral(modulePath)),
-      );
-    }
-  }
-  return statement;
-};
-
-export const TypeshotImportDeclaration = ts.createImportDeclaration(
-  undefined,
-  undefined,
-  ts.createImportClause(ts.createIdentifier('typeshot'), undefined, false),
-  ts.createStringLiteral('typeshot'),
-);
-
-export const isTypeshotImportDeclaration = (node: ts.Node) => {
-  return (
-    ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text === 'typeshot'
-  );
 };

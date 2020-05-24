@@ -1,9 +1,16 @@
 // DO NOT EDIT - GENERATED FILE
-// typeshot-output-header
+
 import type { Options } from 'prettier';
 interface SomeInterface {}
 type SomeType = {};
-export type Hoge = {
+
+import './readme/another-file';
+// eslint-disable-next-line prettier/prettier
+export type a = import('./readme/another-file').Type;
+export const a = import('./readme/another-file');
+
+// typeshot-start
+export interface Hoge {
   hoge: {
     name: 'hoge';
     value: SomeType;
@@ -16,7 +23,7 @@ export type Hoge = {
     name: 'prettier';
     value: Options;
   };
-};
+}
 
 // hogehoge
 
@@ -28,6 +35,10 @@ export type Sample = {
     value: SomeType;
   };
 };
+export type _Sample = {
+  name: 'hoge';
+  value: SomeType;
+};
 
 // fuga
 
@@ -37,17 +48,9 @@ export type Sample0 = {
     value: SomeInterface;
   };
 };
-
-export type HogeSelf = {
-  name: 'hoge';
-  value: SomeType;
-};
-
-export type FugaSelf = {
+export type _Sample0 = {
   name: 'fuga';
   value: SomeInterface;
 };
-// typeshot-output-footer
-// eslint-disable-next-line no-console
-console.log();
+
 export {};

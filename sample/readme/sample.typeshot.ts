@@ -1,43 +1,48 @@
 import typeshot from 'typeshot';
 
-typeshot.configuration({ output: './sample.generated.ts' })`
+typeshot.config({ output: './generated/sample.ts' })`
 // DO NOT EDIT - GENERATED FILE
 `;
-// typeshot-output-header
 
 // eslint-disable-next-line no-console
-console.log('Loaded Generated File!');
+console.log('Start Loading Generated File!');
 
-// typeshot-header
+// typeshot-start
 import type { Type, GenericType } from './another-file';
-type EntryMap<T extends object> = {
-  [K in keyof T]: readonly [K, T[K]];
-};
 
-// typeshot-main
-typeshot.takeStatic<typeshot.Expand<Type>>('UniqueKey-0', 'TypeName')`
-// Descriptions of '${typeshot.TemplateSymbols.NAME}'
-export ${typeshot.TemplateSymbols.DECLARATION}
-export type ${typeshot.TemplateSymbols.NAME}Array = ${typeshot.TemplateSymbols.NAME}[];
-export const ${typeshot.TemplateSymbols.NAME}__sample: ${typeshot.TemplateSymbols.NAME} = { /* ... */ } as any;
+/**
+ * This helps interface to be expanded format.
+ * Or for intersection type, this helps it to be unified type literal.
+ */
+type Expand<T> = { [K in keyof T]: T[K] };
+
+const sampleStatic = typeshot.createType<Expand<Type>>([]);
+typeshot.print`
+// You can write comments here.
+export ${sampleStatic({}).alias('SampleType')}
+export type SampleTypeArray = SampleType[];
+export const SampleType__sample = { foo: 'foo', bar: { baz: 0, qux: new Date() } } as any;
 `;
-
-typeshot.takeStatic<EntryMap<Type>>('UniqueKey-1', 'TypeNameForEntryMap')`
-export ${typeshot.TemplateSymbols.DECLARATION}
-`;
-
-const stringParam = typeshot.createPrameter<DynamicTypeshotProps, string>(({ param }) => [param]);
 
 interface DynamicTypeshotProps {
+  name: string;
   param: string;
 }
-const takeDynamic = typeshot
-  .createDynamic<GenericType<typeshot.T>>('UniqueKey-2')
-  .parameters<DynamicTypeshotProps>([stringParam])
-  .names(({ param }) => `GenericType__${param.toUpperCase()}`)`
-// ${({ param }) => param}
-export ${typeshot.TemplateSymbols.DECLARATION}
+const stringParam = typeshot.createPrameter<string, DynamicTypeshotProps>(({ param }) => typeshot.solo(param));
+
+const dynamicSample = typeshot.createType<GenericType<typeshot.T>, DynamicTypeshotProps>([stringParam]);
+
+const printDynamic = typeshot.createPrinter<DynamicTypeshotProps>`
+  export ${(p) => dynamicSample(p).alias(`${p.name}Alias`)}
+  export ${(p) => dynamicSample(p).interface(`${p.name}Interface`)}
+  export type ${(p) => p.name} = {
+    fooo: ${(p) => dynamicSample(p).literal()};
+  };
 `;
 
-takeDynamic({ param: 'foo' });
-takeDynamic({ param: 'bar' });
+printDynamic({ name: 'Foo', param: 'foo' });
+printDynamic({ name: 'Bar', param: 'bar' });
+
+// typeshot-end
+// eslint-disable-next-line no-console
+console.log('Finish Loading Generated File!');
