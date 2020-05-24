@@ -19,7 +19,7 @@ type Expand<T> = { [K in keyof T]: T[K] };
 const sampleStatic = typeshot.createType<Expand<Type>>([]);
 typeshot.print`
 // You can write comments here.
-export ${sampleStatic.alias('SampleType', {})}
+export ${sampleStatic({}).alias('SampleType')}
 export type SampleTypeArray = SampleType[];
 export const SampleType__sample = { foo: 'foo', bar: { baz: 0, qux: new Date() } } as any;
 `;
@@ -33,10 +33,10 @@ const stringParam = typeshot.createPrameter<string, DynamicTypeshotProps>(({ par
 const dynamicSample = typeshot.createType<GenericType<typeshot.T>, DynamicTypeshotProps>([stringParam]);
 
 const printDynamic = typeshot.createPrinter<DynamicTypeshotProps>`
-  export ${(p) => dynamicSample.alias(`${p.name}Alias`, p)}
-  export ${(p) => dynamicSample.interface(`${p.name}Interface`, p)}
+  export ${(p) => dynamicSample(p).alias(`${p.name}Alias`)}
+  export ${(p) => dynamicSample(p).interface(`${p.name}Interface`)}
   export type ${(p) => p.name} = {
-    fooo: ${(p) => dynamicSample.literal(p)};
+    fooo: ${(p) => dynamicSample(p).literal()};
   };
 `;
 

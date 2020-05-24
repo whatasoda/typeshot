@@ -3,14 +3,14 @@ import type { AddReplecement } from '../transform';
 import { TypeRequest } from '../../context';
 
 const INTERMEDIATE_TYPE_NAME = '__TYPESHOT_INTERMEDIATE__';
-export const createIntermediateType = (requests: TypeRequest[]) => {
+export const createIntermediateType = (requests: Map<string, TypeRequest>) => {
   return ts.createInterfaceDeclaration(
     undefined,
     [ts.createModifier(ts.SyntaxKind.ExportKeyword)],
     INTERMEDIATE_TYPE_NAME,
     undefined,
     undefined,
-    requests.map(({ id, type, property }) => {
+    [...requests.values()].map(({ id, type, property }) => {
       return ts.createPropertySignature(
         undefined,
         ts.createStringLiteral(id),

@@ -54,18 +54,22 @@ namespace typeshot {
     constructor(public readonly id: string, public readonly name: string, public readonly format: T) {}
   }
   export interface TypeTokenFactory<P> {
-    alias(name: string, props: P, property?: string | number): TypeToken;
-    interface(name: string, props: P, property?: string | number): TypeToken;
-    literal(props: P, property?: string | number): TypeToken;
-    named(name: string, property?: string | number): NamedTypeTokenFactory<P>;
-    mapArray(names: string[]): NamedTypeTokenFactory<P>[];
-    mapRecord<T extends string>(names: Record<T, string>): Record<T, NamedTypeTokenFactory<P>>;
+    (props: P): {
+      readonly props: P;
+      alias(name: string): TypeToken;
+      interface(name: string): TypeToken;
+      literal(): TypeToken;
+      property(property: string | number, name: string): PropertyTypeTokenMap;
+      mapArray(names: string[]): PropertyTypeTokenMap[];
+      mapRecord<T extends string>(names: Record<T, string>): Record<T, PropertyTypeTokenMap>;
+    };
   }
-  export interface NamedTypeTokenFactory<P> {
+  export interface PropertyTypeTokenMap {
+    readonly property: string | number;
     readonly name: string;
-    alias(props: P): TokenObject<'alias'>;
-    interface(props: P): TokenObject<'interface'>;
-    literal(props: P): TokenObject<'literal'>;
+    readonly alias: TokenObject<'alias'>;
+    readonly interface: TokenObject<'interface'>;
+    readonly literal: TokenObject<'literal'>;
   }
 
   const _createType = <_, P = {}>(parameterFactory: ParameterFactory<P>, rootId: string): TypeTokenFactory<P> => {
@@ -77,43 +81,48 @@ namespace typeshot {
 
     let count = 0;
 
-    const createToken = <T extends TypeToken['format']>(
-      format: T,
-      name: string,
-      props: P,
-      property?: string | number,
-    ): TokenObject<T> => {
+    const factory: TypeTokenFactory<P> = (props) => {
       const parameters = Array.isArray(parameterFactory)
         ? parameterFactory.map((factory) => factory(props, ASTFactories))
         : parameterFactory(props, ASTFactories);
-
-      const id = `${rootId}-${count++}`;
       const type = injectTypeParameters(typeshot, parameters, info.type);
-      context.requests.push({ id, type, property });
+      const selfId = `${rootId}-${count++}`;
 
-      return new TokenObject(id, name, format);
+      const requestSelf = (name: string, format: TypeToken['format']) => {
+        if (!context.requests.has(selfId)) context.requests.set(selfId, { id: selfId, type });
+        return new TokenObject(selfId, name, format);
+      };
+
+      const requestProperty = (property: string | number, name: string): PropertyTypeTokenMap => {
+        const propertyId = `${selfId}-${property}`;
+        if (!context.requests.has(propertyId)) context.requests.set(propertyId, { id: propertyId, type, property });
+
+        return {
+          property,
+          name,
+          alias: new TokenObject(propertyId, name, 'alias'),
+          interface: new TokenObject(propertyId, name, 'interface'),
+          literal: new TokenObject(propertyId, name, 'literal'),
+        };
+      };
+
+      return {
+        props,
+        alias: (name) => requestSelf(name, 'alias'),
+        interface: (name) => requestSelf(name, 'interface'),
+        literal: () => requestSelf('NO_NAME', 'literal'),
+        property: requestProperty,
+        mapArray: (names) => names.map((name, property) => requestProperty(property, name)),
+        mapRecord: (names) => {
+          return Object.keys(names).reduce<Record<string, PropertyTypeTokenMap>>((acc, property) => {
+            acc[property] = requestProperty(property, names[property as keyof typeof names]);
+            return acc;
+          }, {});
+        },
+      };
     };
 
-    const named = (name: string, property?: string | number): NamedTypeTokenFactory<P> => ({
-      name,
-      alias: (props) => createToken('alias', name, props, property),
-      interface: (props) => createToken('interface', name, props, property),
-      literal: (props) => createToken('literal', name, props, property),
-    });
-
-    return {
-      alias: (...args) => createToken('alias', ...args),
-      interface: (...args) => createToken('interface', ...args),
-      literal: (...args) => createToken('literal', 'UNNAMED', ...args),
-      named,
-      mapArray: (names) => names.map(named),
-      mapRecord: (names) => {
-        return Object.keys(names).reduce<Record<string, NamedTypeTokenFactory<P>>>((acc, property) => {
-          acc[property] = named(names[property as keyof typeof names], property);
-          return acc;
-        }, {});
-      },
-    };
+    return factory;
   };
   // The rootId will auto matically injected.
   export const createType = _createType as <_, P = {}>(parameterFactory: ParameterFactory<P>) => TypeTokenFactory<P>;

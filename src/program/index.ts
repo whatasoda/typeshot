@@ -8,7 +8,7 @@ import { forEachChildrenDeep } from './ast-utils';
 import { handleTypeshotMethod } from './resolvers/typeshot-method';
 import { createIntermediateType, parseIntermediateType } from './resolvers/intermediate-type';
 import { createModulePathResolver, isTypeshotImportDeclaration } from './resolvers/import-path';
-import runSourceWithContext, { TypeshotContext, TypeInformation } from '../context';
+import runSourceWithContext, { TypeshotContext, TypeInformation, TypeRequest } from '../context';
 import '../typeshot';
 
 export interface ProgramConfig {
@@ -110,7 +110,7 @@ const handleEntrypoint = (
   const context = runSourceWithContext(source, codeToExecute, options, {
     getType: (id) => types.get(id),
     template: [],
-    requests: [],
+    requests: new Map<string, TypeRequest>(),
   });
 
   const intermediate = printer.printNode(ts.EmitHint.Unspecified, createIntermediateType(context.requests), source);

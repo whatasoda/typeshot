@@ -23,9 +23,9 @@ type MappedType<T extends Record<string, any>> = {
   [K in keyof T]: { name: K; value: T[K] };
 };
 
-const Hoge = typeshot.createType<MappedType<SomeTypeMap>>([]).named('Hoge');
+const Hoge = typeshot.createType<MappedType<SomeTypeMap>>([])({}).interface('Hoge');
 typeshot.print`
-  export ${Hoge.interface({})}
+  export ${Hoge}
 `;
 
 interface DynamicSampleProps {
@@ -45,8 +45,8 @@ const dynamicSample = typeshot.createType<Pick<MappedType<SomeTypeMap>, typeshot
 const printDynamicSample = typeshot.createPrinter<DynamicSampleProps>`
   // ${({ description }) => description}
   ${({ name }) => (name === 'Sample' ? template : [])}
-  export ${(p) => dynamicSample.alias(p.name, p)}
-  export type _${(p) => p.name} = ${(p) => dynamicSample.literal(p, p.pick)}
+  export ${(p) => dynamicSample(p).alias(p.name)}
+  export type _${(p) => p.name} = ${(p) => dynamicSample(p).property(p.pick, '').literal}
 `;
 
 printDynamicSample({ name: 'Sample', description: 'hogehoge', pick: 'hoge' });

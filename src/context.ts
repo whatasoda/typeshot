@@ -5,7 +5,7 @@ import type { Config, TypeToken } from './typeshot';
 
 export interface TypeshotContext {
   readonly getType: (id: string) => TypeInformation | undefined;
-  readonly requests: TypeRequest[];
+  readonly requests: Map<string, TypeRequest>;
   readonly template: (string | TypeToken)[];
   header?: string;
   config?: Config;
