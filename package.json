@@ -1,6 +1,6 @@
 {
   "name": "typeshot",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "typeshot is a code generator like snapshot library, for TypeScript Declaration Files",
   "main": "index.js",
   "scripts": {
