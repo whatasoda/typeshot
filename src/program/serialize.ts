@@ -43,7 +43,6 @@ export const serializeEntry = (
     ts.NodeBuilderFlags.InTypeAlias |
       ts.NodeBuilderFlags.NoTruncation |
       ts.NodeBuilderFlags.IgnoreErrors |
-      ts.NodeBuilderFlags.MultilineObjectLiterals |
       ts.NodeBuilderFlags.GenerateNamesForShadowedTypeParams,
   );
   if (resolved) {
