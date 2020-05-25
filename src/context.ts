@@ -1,5 +1,5 @@
 import ts from 'typescript';
-import vm from 'vm';
+import path from 'path';
 import { Module } from 'module';
 import type { Config, TypeToken } from './typeshot';
 
@@ -26,6 +26,7 @@ const CURRENT_TYPESHOT_CONTEXT = { current: null as null | TypeshotContext };
 
 export const getCurrentContext = () => CURRENT_TYPESHOT_CONTEXT.current;
 
+const parent = module;
 const runSourceWithContext = (
   source: ts.SourceFile,
   sourceText: string,
@@ -34,17 +35,15 @@ const runSourceWithContext = (
 ): TypeshotContext => {
   const prev = CURRENT_TYPESHOT_CONTEXT.current;
   try {
-    const executableCode = ts.transpile(sourceText, options);
-    const { fileName } = source;
-
-    const MODULE = new Module(fileName, module);
-    const pure = MODULE.require;
-    MODULE.filename = fileName;
-    MODULE.require = ((id) => (id === 'typeshot' ? require('./typeshot') : pure.call(MODULE, id))) as typeof require;
-    Object.assign(MODULE.require, pure);
-
+    const { fileName: filename } = source;
+    const script = ts.transpile(sourceText, options);
     CURRENT_TYPESHOT_CONTEXT.current = context;
-    vm.runInNewContext(executableCode, MODULE);
+
+    // https://github.com/nodejs/node/blob/6add5b31fcc4ae45a8603f886477c544a99e0188/lib/internal/bootstrap_node.js#L415
+    const module = new Module(filename, parent);
+    module.filename = filename;
+    module.paths = (Module as any)._nodeModulePaths(path.dirname(filename));
+    (module as any)._compile(script, filename);
   } catch (e) {
     // eslint-disable-next-line no-console
     console.log(e);

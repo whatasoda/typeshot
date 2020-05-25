@@ -23,6 +23,7 @@ type MappedType<T extends Record<string, any>> = {
   [K in keyof T]: { name: K; value: T[K] };
 };
 
+require('prettier');
 const Hoge = typeshot.createType<MappedType<SomeTypeMap>>([])({}).interface('Hoge');
 typeshot.print`
   export ${Hoge}

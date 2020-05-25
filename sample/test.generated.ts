@@ -11,46 +11,21 @@ export const a = import('./readme/another-file');
 
 // typeshot-start
 export interface Hoge {
-  hoge: {
-    name: 'hoge';
-    value: SomeType;
-  };
-  fuga: {
-    name: 'fuga';
-    value: SomeInterface;
-  };
-  prettier: {
-    name: 'prettier';
-    value: Options;
-  };
+  hoge: { name: 'hoge'; value: SomeType };
+  fuga: { name: 'fuga'; value: SomeInterface };
+  prettier: { name: 'prettier'; value: Options };
 }
 
 // hogehoge
 
 // Sample
 
-export type Sample = {
-  hoge: {
-    name: 'hoge';
-    value: SomeType;
-  };
-};
-export type _Sample = {
-  name: 'hoge';
-  value: SomeType;
-};
+export type Sample = { hoge: { name: 'hoge'; value: SomeType } };
+export type _Sample = { name: 'hoge'; value: SomeType };
 
 // fuga
 
-export type Sample0 = {
-  fuga: {
-    name: 'fuga';
-    value: SomeInterface;
-  };
-};
-export type _Sample0 = {
-  name: 'fuga';
-  value: SomeInterface;
-};
+export type Sample0 = { fuga: { name: 'fuga'; value: SomeInterface } };
+export type _Sample0 = { name: 'fuga'; value: SomeInterface };
 
 export {};

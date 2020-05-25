@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build": "rimraf ./lib && tsc -p tsconfig.lib.json && cp package.json README.md LICENSE ./lib",
-    "test": "exit 0"
+    "test": "exit 0",
+    "prepare": "mkdir -p node_modules/typeshot && echo \"module.exports = require('../../src')\" > node_modules/typeshot/index.js"
   },
   "repository": {
     "type": "git",
