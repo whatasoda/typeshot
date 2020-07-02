@@ -34,7 +34,7 @@ jobs:
           node-version: 14
       - run: npm ci
       - run: npm run build
-      - run: npx semantic-release
+      - run: cd ./lib && npx semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.npm_token }}
