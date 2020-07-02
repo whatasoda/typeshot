@@ -10,7 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/whatasoda/typeshot.git"
+    "url": "https://github.com/whatasoda/typeshot.git"
   },
   "keywords": [
     "typescript",
@@ -37,6 +37,7 @@
     "eslint-plugin-prettier": "^3.1.3",
     "prettier": "^2.0.5",
     "rimraf": "^3.0.2",
+    "semantic-release": "^17.1.1",
     "ts-node": "^8.9.0",
     "typescript": "^3.8.3"
   },
