@@ -8,7 +8,7 @@ module.exports = {
   },
   rules: {
     'no-redeclare': 0,
-    'no-console': 'error',
+    'no-console': 0,
     'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     '@typescript-eslint/no-unused-vars': [2, { args: 'none' }],
   },
