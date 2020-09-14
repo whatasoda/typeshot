@@ -2,9 +2,11 @@ import ts from 'typescript';
 import path from 'path';
 import { Module } from 'module';
 import type { Config, TypeToken } from './typeshot';
+import type { TypeDefinition } from './registerTypeDefinition';
 
 export interface TypeshotContext {
   readonly getType: (id: string) => TypeInformation | undefined;
+  readonly definitions: Map<string, TypeDefinition>;
   readonly requests: Map<string, TypeRequest>;
   readonly template: (string | TypeToken)[];
   header?: string;
@@ -24,7 +26,11 @@ export interface TypeRequest {
 
 const CURRENT_TYPESHOT_CONTEXT = { current: null as null | TypeshotContext };
 
-export const getCurrentContext = () => CURRENT_TYPESHOT_CONTEXT.current;
+export const getCurrentContext = () => {
+  const context = CURRENT_TYPESHOT_CONTEXT.current;
+  if (context) return context;
+  throw new Error('Context Missed: Make sure to run via typeshot program');
+};
 
 const parent = module;
 const runSourceWithContext = (
@@ -52,6 +58,5 @@ const runSourceWithContext = (
   }
   return context;
 };
-runSourceWithContext.hoge = () => require('./typeshot');
 
 export default runSourceWithContext;
