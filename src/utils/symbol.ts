@@ -1,1 +1,1 @@
-export const getSymbolName = (symbol: symbol): string => symbol.toString().slice(/* Symbol( */ 6, /* ) */ -1);
+export const getSymbolName = (symbol: symbol): string => symbol.toString().slice(/* Symbol( */ 7, /* ) */ -1);
