@@ -1,6 +1,5 @@
 import { getCurrentContext } from './context';
 import { CodeStack, withStackTracking } from './utils/stack-tracking';
-// import { evaluateTaggedTemplate } from './tagged-template';
 
 namespace typeshot {
   export type Typeshot = typeof typeshot;
@@ -80,37 +79,43 @@ namespace typeshot {
     },
   );
 
-  // /*
+  /* Printer */
+  export type TemplateSubtitutionsArray = (string | number | boolean | undefined | null | TypeToken)[];
+  export type ResolvedTemplateArray = (string | TypeToken)[];
 
-  // Printer
+  export const print = (templateArray: TemplateStringsArray, ...substitutions: TemplateSubtitutionsArray): void => {
+    const context = getCurrentContext();
+    reduceTaggedTemplate(context.template, templateArray, substitutions);
+  };
 
-  // */
-  // export type StaticSubtitution = string | number | boolean | undefined | null;
-  // export type FunctionSubstitution<P> = (props: P) => StaticSubtitution | DynamicSubtitution<P>[];
-  // export type DynamicSubtitution<P> = StaticSubtitution | FunctionSubstitution<P>;
-  // export type ResolvedTemplate = string;
+  export const template = (
+    templateArray: TemplateStringsArray,
+    ...substitutions: TemplateSubtitutionsArray
+  ): ResolvedTemplateArray => {
+    return reduceTaggedTemplate([], templateArray, substitutions);
+  };
 
-  // export const print = (template: TemplateStringsArray, ...substitutions: StaticSubtitution[]) => {
-  //   const context = getCurrentContext();
-  //   evaluateTaggedTemplate(template, substitutions, null, context.template);
-  // };
+  const reduceTaggedTemplate = (
+    acc: ResolvedTemplateArray,
+    templateArray: TemplateStringsArray,
+    substitutions: TemplateSubtitutionsArray,
+  ): ResolvedTemplateArray => {
+    let pointer = acc.length;
+    acc[pointer] = templateArray[0];
+    for (let i = 0, length = substitutions.length; i < length; i++) {
+      const substitution = substitutions[i];
+      if (substitution instanceof TypeTokenObject) {
+        acc[++pointer] = substitution;
+        acc[++pointer] = '';
+      } else {
+        acc[pointer] += typeof substitution === 'string' ? substitution : String(substitution);
+      }
+      acc[pointer] += templateArray[i + 1];
+    }
+    return acc;
+  };
 
-  // export const createPrinter = <P>(template: TemplateStringsArray, ...substitutions: DynamicSubtitution<P>[]) => {
-  //   return (props: P) => {
-  //     const context = getCurrentContext();
-  //     evaluateTaggedTemplate(template, substitutions, props, context.template);
-  //   };
-  // };
-
-  // export const createTemplate = <P>(template: TemplateStringsArray, ...substitutions: DynamicSubtitution<P>[]) => {
-  //   return evaluateTaggedTemplate(template, substitutions, null, []);
-  // };
-
-  /*
-  
-  Config
-  
-  */
+  /* Config */
   export interface Config {
     output?: string;
   }

@@ -1,24 +1,12 @@
-import ts from 'typescript';
 import { REGISTER_INSTANCE, register, RegisterOptions } from 'ts-node';
-import type { Config, TypeDefinition, TypeToken } from './typeshot';
+import type { Config, ResolvedTemplateArray, TypeDefinition } from './typeshot';
 
 export interface TypeshotContext {
   readonly definitions: Map<string, TypeDefinition>;
-  readonly template: (string | TypeToken)[];
+  readonly template: ResolvedTemplateArray;
   header?: string;
   config?: Config;
   promise?: Promise<void>;
-}
-
-export interface TypeInformation {
-  rootId: string;
-  type: ts.TypeNode;
-}
-
-export interface TypeRequest {
-  id: string;
-  type: ts.TypeNode;
-  property?: string | number;
 }
 
 const CURRENT_TYPESHOT_CONTEXT = { current: null as null | TypeshotContext };
@@ -29,7 +17,7 @@ export const getCurrentContext = () => {
   throw new Error('Context Missed: Make sure to run via typeshot program');
 };
 
-const runWithContext = async (
+export const runWithContext = async (
   filename: string,
   context: TypeshotContext,
   registerOptions?: RegisterOptions,
@@ -48,5 +36,3 @@ const runWithContext = async (
   }
   return context;
 };
-
-export default runWithContext;
