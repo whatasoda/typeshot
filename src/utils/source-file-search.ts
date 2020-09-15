@@ -31,7 +31,7 @@ export const getNodeByStack = <T extends ts.Node = ts.Node>(
   while (layer.length) {
     LAYER_LOOP: for (let i = 0, length = layer.length; i < length; i++) {
       const node = layer[i];
-      if (pos === node.pos) {
+      if (pos === node.getStart()) {
         if (!filterPath || filterPath(node)) {
           nodePath.push(node as T);
         }
@@ -39,7 +39,7 @@ export const getNodeByStack = <T extends ts.Node = ts.Node>(
       }
 
       const nextNode: ts.Node | undefined = layer[i + 1];
-      if (!nextNode || pos < nextNode.pos) {
+      if (!nextNode || pos < nextNode.getStart()) {
         if (!filterPath || filterPath(node)) {
           nodePath.push(node as T);
         }
