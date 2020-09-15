@@ -34,9 +34,8 @@ export const flattenCallLikeExpressionChain = (entry: ts.Expression) => {
   return result.reverse();
 };
 
-export const forEachChildrenDeep = (root: ts.Node, callback: (node: ts.Node) => void) => {
+export const forEachChildDeep = (root: ts.Node, callback: (node: ts.Node) => void) => {
   const queue: ts.Node[] = [root];
-
   while (queue.length) {
     const node = queue.shift()!;
     callback(node);

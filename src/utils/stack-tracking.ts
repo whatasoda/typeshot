@@ -21,6 +21,13 @@ const parseStack = (stack: string = '', depth: number): CodeStack => {
   return { composed, filename, line: ~~line, col: ~~col };
 };
 
+const getCachedStack = (stack: string = '', depth: number, cacheStore: Map<string, CodeStack>) => {
+  const result = parseStack(stack, depth);
+  const cached = cacheStore.get(result.composed);
+  return cached || result;
+};
+
 export const withStackTracking = <T, U extends any[]>(func: (stack: CodeStack, ...args: U) => T) => {
-  return (...args: U) => func(parseStack(new Error().stack, 1), ...args);
+  const cacheStore = new Map<string, CodeStack>();
+  return (...args: U) => func(getCachedStack(new Error().stack, 1, cacheStore), ...args);
 };

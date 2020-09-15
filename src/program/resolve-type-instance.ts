@@ -1,9 +1,9 @@
-import { TypeDependencies, TypeKind, TypeToken } from '../typeshot';
+import { FragmentDependencies, TypeKind, TypeInstance } from '../typeshot';
 import { getSymbolName } from '../utils/symbol';
 import type { ResolvedTypeDefinition } from './resolve-type-definition';
 
-export const resolveTypeToken = (token: TypeToken, definition: ResolvedTypeDefinition) => {
-  return resolvePayload(token.payload, definition);
+export const resolveTypeInstance = (instance: TypeInstance, definition: ResolvedTypeDefinition) => {
+  return resolvePayload(instance.payload, definition);
 };
 
 const resolvePayload = (payload: any, definition: ResolvedTypeDefinition, resolved: Set<any> = new Set()): string => {
@@ -45,12 +45,12 @@ const resolvePayload = (payload: any, definition: ResolvedTypeDefinition, resolv
 
   const fragments = Object.getOwnPropertySymbols(payload).map((fragmentSymbol) => {
     const fragmentId = getSymbolName(fragmentSymbol);
-    const fragment = fragmentTemplates[fragmentId];
+    const fragment = fragmentTemplates.get(fragmentId);
     if (!fragment) {
       throw new Error(`Fragment Not Found: check around '${fragmentId}'`);
     }
     const { template, substitutions } = fragment;
-    const dependencies: TypeDependencies = payload[fragmentSymbol] || {};
+    const dependencies: FragmentDependencies = payload[fragmentSymbol] || {};
     return String.raw(
       Object.assign(template, { raw: template }),
       ...substitutions.map((dependencyName) => {

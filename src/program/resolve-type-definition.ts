@@ -1,42 +1,28 @@
 import ts from 'typescript';
-import { TypeDefinition } from '../typeshot';
+import { TypeDefinitionInfo } from '../typeshot';
 import { getNodeByStack, getSourceFileByStack } from '../utils/source-file-search';
 import { forEachChildDeep } from './ast-utils';
 
-export interface ResolvedTypeDefinition extends TypeDefinition {
+export interface ResolvedTypeDefinition extends TypeDefinitionInfo {
   transformRange: readonly [start: number, end: number];
   sourceFile: ts.SourceFile;
-  fragmentTemplates: Record<string, TypeFragmentTemplate>;
+  fragmentTemplates: Map<string, TypeFragmentTemplate>;
 }
 
 interface TypeFragmentTemplate {
   fragmentText: string;
   template: string[];
+  /** item should be a dependency name */
   substitutions: string[];
 }
 
 export const resolveTypeDefinition = (
-  definition: TypeDefinition,
+  definition: TypeDefinitionInfo,
   getSourceFile: (filename: string) => ts.SourceFile | null,
-): ResolvedTypeDefinition => {
+) => {
   const sourceFile = getSourceFileByStack(definition.stack, getSourceFile);
   const transformRange = parseTypeDefinition(definition, sourceFile);
-
-  const fragmentTemplates = Object.entries(definition.fragmentStacks).reduce<Record<string, TypeFragmentTemplate>>(
-    (acc, [id, fragmentStack]) => {
-      const { nodePath } = getNodeByStack(fragmentStack, sourceFile, ts.isCallExpression);
-      const nearestCallExpression = nodePath[nodePath.length - 1];
-      if (!nearestCallExpression.typeArguments || nearestCallExpression.typeArguments.length !== 1) {
-        const length = nearestCallExpression.typeArguments?.length || 0;
-        throw new RangeError(
-          `Invalid Type Argument Range: 'createTypeFragment' requires 1 type argument, but received ${length} at '${id}'`,
-        );
-      }
-      acc[id] = parseFragmentTypeNode(nearestCallExpression.typeArguments[0]);
-      return acc;
-    },
-    {},
-  );
+  const fragmentTemplates = resolveFragments(definition, sourceFile);
 
   return {
     ...definition,
@@ -46,7 +32,7 @@ export const resolveTypeDefinition = (
   };
 };
 
-const parseTypeDefinition = ({ id, stack }: TypeDefinition, sourceFile: ts.SourceFile) => {
+const parseTypeDefinition = ({ id, stack }: TypeDefinitionInfo, sourceFile: ts.SourceFile) => {
   const { nodePath } = getNodeByStack(stack, sourceFile, ts.isCallExpression);
   const nearestCallExpression = nodePath[nodePath.length - 1];
   const argumentLength = nearestCallExpression.arguments.length;
@@ -64,6 +50,22 @@ const parseTypeDefinition = ({ id, stack }: TypeDefinition, sourceFile: ts.Sourc
   }
 
   return [factory.getStart(), factory.getEnd()] as const;
+};
+
+const resolveFragments = ({ fragments }: TypeDefinitionInfo, sourceFile: ts.SourceFile) => {
+  const templates = new Map<string, TypeFragmentTemplate>();
+  fragments.forEach((stack, id) => {
+    const { nodePath } = getNodeByStack(stack, sourceFile, ts.isCallExpression);
+    const nearestCallExpression = nodePath[nodePath.length - 1];
+    if (!nearestCallExpression.typeArguments || nearestCallExpression.typeArguments.length !== 1) {
+      const length = nearestCallExpression.typeArguments?.length || 0;
+      throw new RangeError(
+        `Invalid Type Argument Range: 'createTypeFragment' requires 1 type argument, but received ${length} at '${id}'`,
+      );
+    }
+    templates.set(id, parseFragmentTypeNode(nearestCallExpression.typeArguments[0]));
+  });
+  return templates;
 };
 
 const parseFragmentTypeNode = (

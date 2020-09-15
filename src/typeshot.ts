@@ -12,28 +12,31 @@ namespace typeshot {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  export type CreateTypeFragment = <_>(deps: TypeDependencies) => Readonly<TypeFragment>;
-  export type TypeFragmentStacks = Record<string, CodeStack>;
-  export type TypeFragment = Record<symbol, TypeDependencies>;
-  export type TypeDependencies = Record<string, any>;
+  export type CreateTypeFragment = <_>(deps: FragmentDependencies) => Readonly<Fragment>;
+  export type Fragment = Record<symbol, FragmentDependencies>;
+  export type FragmentDependencies = Record<string, any>;
+  export type FragmentInfo = CodeStack;
 
-  export interface TypeDefinition {
+  export interface TypeDefinitionInfo {
     id: string;
     stack: CodeStack;
-    fragmentStacks: TypeFragmentStacks;
+    fragments: Map<string, FragmentInfo>;
   }
   export type TypeDefinitionFactory<T extends object> = (props: T, createTypeFragment: CreateTypeFragment) => any;
   export type RegisterTypeDefinition = {
-    <T extends object>(factory: TypeDefinitionFactory<T>): (props: T) => TypeTokenFactory;
+    <T extends object>(factory: TypeDefinitionFactory<T>): (props: T) => TypeInstanceFactory;
   };
 
-  export interface TypeTokenFactory {
-    alias(name: string): TypeToken;
-    interface(name: string): TypeToken;
-    literal(): TypeToken;
+  export interface TypeInstanceFactory {
+    alias(name: string): TypeInstance;
+    interface(name: string): TypeInstance;
+    literal(): TypeInstance;
   }
-  export type TypeToken = TypeTokenObject<'alias'> | TypeTokenObject<'interface'> | TypeTokenObject<'literal'>;
-  export class TypeTokenObject<T extends 'alias' | 'interface' | 'literal'> {
+  export type TypeInstance =
+    | TypeInstanceObject<'alias'>
+    | TypeInstanceObject<'interface'>
+    | TypeInstanceObject<'literal'>;
+  export class TypeInstanceObject<T extends 'alias' | 'interface' | 'literal'> {
     public readonly id: string;
     constructor(
       public readonly definitionId: string,
@@ -41,35 +44,35 @@ namespace typeshot {
       public readonly name: string,
       public readonly format: T,
     ) {
-      const ID = tokenNextIdMap.get(definitionId) || 0;
+      const ID = instanceNextIdMap.get(definitionId) || 0;
       this.id = `${ID}`;
-      tokenNextIdMap.set(definitionId, ID + 1);
+      instanceNextIdMap.set(definitionId, ID + 1);
     }
   }
-  const tokenNextIdMap = new Map<string, number>();
+  const instanceNextIdMap = new Map<string, number>();
 
   export const registerTypeDefinition: RegisterTypeDefinition = withStackTracking(
     <T extends object>(definitionStack: CodeStack, factory: TypeDefinitionFactory<T>) => {
       const context = getContext();
       const definitionId = `definition@${definitionStack.composed}`;
-      const definition: TypeDefinition = {
+      const definitionInfo: TypeDefinitionInfo = {
         id: definitionId,
         stack: definitionStack,
-        fragmentStacks: Object.create(null),
+        fragments: new Map(),
       };
-      context.definitions.set(definitionId, definition);
+      context.definitions.set(definitionId, definitionInfo);
 
-      return (props: T) => {
-        const { fragmentStacks } = definition;
+      return (props: T): TypeInstanceFactory => {
+        const { fragments } = definitionInfo;
         const createTypeFragment: CreateTypeFragment = withStackTracking(
-          (fragmentStack, dependencies): TypeFragment => {
+          (fragmentStack, dependencies): Fragment => {
             // TODO: put some comment
             const fragmentId = `fragment@${fragmentStack.composed}`;
-            const fragmentSymbol = Symbol(fragmentId);
-            fragmentStacks[fragmentId] = fragmentStack;
+            if (!fragments.has(fragmentId)) {
+              fragments.set(fragmentId, fragmentStack);
+            }
 
-            const fragment: TypeFragment = Object.create(null);
-            return Object.freeze(Object.assign(fragment, { [fragmentSymbol]: dependencies }));
+            return Object.assign(Object.create(null), { [Symbol(fragmentId)]: dependencies });
           },
         );
 
@@ -77,17 +80,17 @@ namespace typeshot {
         const common = [definitionId, payload] as const;
 
         return {
-          alias: (name) => new TypeTokenObject(...common, name, 'alias'),
-          interface: (name) => new TypeTokenObject(...common, name, 'interface'),
-          literal: () => new TypeTokenObject(...common, 'NO_NAME', 'literal'),
+          alias: (name) => new TypeInstanceObject(...common, name, 'alias'),
+          interface: (name) => new TypeInstanceObject(...common, name, 'interface'),
+          literal: () => new TypeInstanceObject(...common, 'NO_NAME', 'literal'),
         };
       };
     },
   );
 
   /* Printer */
-  export type TemplateSubtitutionsArray = (string | number | boolean | undefined | null | TypeToken)[];
-  export type ResolvedTemplateArray = (string | TypeToken)[];
+  export type TemplateSubtitutionsArray = (string | number | boolean | undefined | null | TypeInstance)[];
+  export type ResolvedTemplateArray = (string | TypeInstance)[];
 
   export const print = (templateArray: TemplateStringsArray, ...substitutions: TemplateSubtitutionsArray): void => {
     const context = getContext();
@@ -110,7 +113,7 @@ namespace typeshot {
     acc[pointer] = templateArray[0];
     for (let i = 0, length = substitutions.length; i < length; i++) {
       const substitution = substitutions[i];
-      if (substitution instanceof TypeTokenObject) {
+      if (substitution instanceof TypeInstanceObject) {
         acc[++pointer] = substitution;
         acc[++pointer] = '';
       } else {

@@ -1,8 +1,8 @@
 import { REGISTER_INSTANCE, register, RegisterOptions } from 'ts-node';
-import type { Config, ResolvedTemplateArray, TypeDefinition } from './typeshot';
+import type { Config, ResolvedTemplateArray, TypeDefinitionInfo } from './typeshot';
 
 export interface TypeshotContext {
-  readonly definitions: Map<string, TypeDefinition>;
+  readonly definitions: Map<string, TypeDefinitionInfo>;
   readonly template: ResolvedTemplateArray;
   header?: string;
   config?: Config;
