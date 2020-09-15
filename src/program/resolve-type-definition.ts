@@ -1,9 +1,10 @@
 import ts from 'typescript';
 import { TypeDefinition } from '../typeshot';
 import { getNodeByStack, getSourceFileByStack } from '../utils/source-file-search';
+import { forEachChildDeep } from './ast-utils';
 
 export interface ResolvedTypeDefinition extends TypeDefinition {
-  range: readonly [number, number];
+  transformRange: readonly [start: number, end: number];
   sourceFile: ts.SourceFile;
   fragmentTemplates: Record<string, TypeFragmentTemplate>;
 }
@@ -19,7 +20,7 @@ export const resolveTypeDefinition = (
   getSourceFile: (filename: string) => ts.SourceFile | null,
 ): ResolvedTypeDefinition => {
   const sourceFile = getSourceFileByStack(definition.stack, getSourceFile);
-  const range = parseTypeDefinition(definition, sourceFile);
+  const transformRange = parseTypeDefinition(definition, sourceFile);
 
   const fragmentTemplates = Object.entries(definition.fragmentStacks).reduce<Record<string, TypeFragmentTemplate>>(
     (acc, [id, fragmentStack]) => {
@@ -39,7 +40,7 @@ export const resolveTypeDefinition = (
 
   return {
     ...definition,
-    range,
+    transformRange,
     sourceFile,
     fragmentTemplates,
   };
@@ -73,7 +74,7 @@ const parseFragmentTypeNode = (
   const template: string[] = [];
   const substitutions: string[] = [];
   let cursor = fragmentTypeNode.getStart();
-  ts.forEachChild(fragmentTypeNode, (node) => {
+  forEachChildDeep(fragmentTypeNode, (node) => {
     if (ts.isTypeQueryNode(node)) {
       template.push(sourceText.slice(cursor, node.getStart()));
       const dependencyName = node.exprName.getText();
