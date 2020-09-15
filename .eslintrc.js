@@ -1,25 +1,7 @@
 module.exports = {
-  extends: ['eslint:recommended', 'plugin:prettier/recommended'],
-  plugins: ['@typescript-eslint'],
-  parser: '@typescript-eslint/parser',
+  extends: ['@whatasoda'],
   parserOptions: {
-    sourceType: 'module',
     project: './tsconfig.json',
-  },
-  rules: {
-    'no-redeclare': 0,
-    'no-console': 0,
-    'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-    '@typescript-eslint/no-unused-vars': [2, { args: 'none' }],
-  },
-  globals: {
-    process: true,
-    module: true,
-    typeshot: true,
-  },
-  env: {
-    jest: true,
-    es6: true,
-    node: true,
+    tsconfigRootDir: '.',
   },
 };
