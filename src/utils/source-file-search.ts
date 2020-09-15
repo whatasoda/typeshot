@@ -14,22 +14,25 @@ export const getSourceFileByStack = (stack: CodeStack, getSourceFile: (filename:
 export const getNodeByStack = <T extends ts.Node = ts.Node>(
   stack: CodeStack,
   sourceFile: ts.SourceFile,
-  filterAncestors?: (node: ts.Node) => node is T,
+  filterPath?: (node: ts.Node) => node is T,
 ) => {
   const { filename, line, col } = stack;
   if (filename !== sourceFile.fileName) throw new Error('Invalid Source File: filename unmatched');
 
+  const { statements } = sourceFile;
+  if (statements[0].parent !== sourceFile) throw new Error('Make sure to turn setParentNodes true');
+
   const lines = sourceFile.getLineStarts();
   if (line >= lines.length) throw new Error('Unexpected Line Information: something wrong happened');
 
-  const pos = lines[line] + col;
-  let layer: readonly ts.Node[] = sourceFile.statements;
+  const pos = lines[line - 1] + col - 1;
+  let layer: readonly ts.Node[] = statements;
   const nodePath: T[] = [];
   while (layer.length) {
-    for (let i = 0, length = layer.length; i < length; i++) {
+    LAYER_LOOP: for (let i = 0, length = layer.length; i < length; i++) {
       const node = layer[i];
       if (pos === node.pos) {
-        if (!filterAncestors || filterAncestors(node)) {
+        if (!filterPath || filterPath(node)) {
           nodePath.push(node as T);
         }
         return { node, nodePath, sourceFile };
@@ -37,10 +40,11 @@ export const getNodeByStack = <T extends ts.Node = ts.Node>(
 
       const nextNode: ts.Node | undefined = layer[i + 1];
       if (!nextNode || pos < nextNode.pos) {
-        if (!filterAncestors || filterAncestors(node)) {
+        if (!filterPath || filterPath(node)) {
           nodePath.push(node as T);
         }
         layer = node.getChildren();
+        break LAYER_LOOP;
       }
     }
   }
