@@ -1,19 +1,18 @@
 import ts from 'typescript';
-import type { TypeInstance } from '../typeshot';
-import { ResolvedTypeDefinition } from './resolve-type-definition';
+import { TypeDefinition } from './resolve-type-definition';
 
-export const createIntermediateFiles = (collection: Map<ResolvedTypeDefinition, Map<TypeInstance, string>>) => {
+export const createIntermediateFiles = (definitions: Map<string, TypeDefinition>) => {
   type Transform = {
     start: number;
     end: number;
     content: string;
   };
   const intermediateTransforms = new Map<ts.SourceFile, Transform[]>();
-  collection.forEach((tokens, definition) => {
-    const { sourceFile, transformRange } = definition;
+  definitions.forEach((definition) => {
+    const { sourceFile, start, end } = definition;
     let acc: string = '';
-    tokens.forEach((tokenContent, token) => {
-      acc += `${token.id}: ${tokenContent};`;
+    definition.intermediateTypes.forEach((intermediateType, token) => {
+      acc += `${token.id}: ${intermediateType};`;
     });
     const content = `() => {type _ = {${acc}};}`;
 
@@ -21,7 +20,6 @@ export const createIntermediateFiles = (collection: Map<ResolvedTypeDefinition, 
       intermediateTransforms.set(sourceFile, []);
     }
     const transforms = intermediateTransforms.get(sourceFile)!;
-    const [start, end] = transformRange;
     transforms[start] = { start, end, content };
   });
 

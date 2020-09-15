@@ -1,17 +1,30 @@
 import ts from 'typescript';
-import { TypeDefinitionInfo } from '../typeshot';
+import { TypeDefinitionInfo, TypeInstance } from '../typeshot';
 import { getNodeByStack, getSourceFileByStack } from '../utils/source-file-search';
+import { CodeStack } from '../utils/stack-tracking';
 import { forEachChildDeep } from './ast-utils';
 
-export interface ResolvedTypeDefinition extends TypeDefinitionInfo {
-  transformRange: readonly [start: number, end: number];
-  sourceFile: ts.SourceFile;
-  fragmentTemplates: Map<string, TypeFragmentTemplate>;
+export class TypeDefinition {
+  public readonly id: string;
+  public readonly stack: CodeStack;
+  public readonly start: number;
+  public readonly end: number;
+  public readonly sourceFile: ts.SourceFile;
+  public readonly fragments: Map<string, TypeFragmentTemplate> = new Map();
+  public readonly intermediateTypes: Map<TypeInstance, string> = new Map();
+
+  constructor(definition: TypeDefinitionInfo, getSourceFile: (filename: string) => ts.SourceFile | null) {
+    this.id = definition.id;
+    this.stack = definition.stack;
+    this.sourceFile = getSourceFileByStack(definition.stack, getSourceFile);
+    [this.start, this.end] = parseTypeDefinition(definition, this.sourceFile);
+    resolveFragments(this.fragments, definition, this.sourceFile);
+  }
 }
 
 interface TypeFragmentTemplate {
   fragmentText: string;
-  template: string[];
+  templateStrings: TemplateStringsArray;
   /** item should be a dependency name */
   substitutions: string[];
 }
@@ -20,16 +33,7 @@ export const resolveTypeDefinition = (
   definition: TypeDefinitionInfo,
   getSourceFile: (filename: string) => ts.SourceFile | null,
 ) => {
-  const sourceFile = getSourceFileByStack(definition.stack, getSourceFile);
-  const transformRange = parseTypeDefinition(definition, sourceFile);
-  const fragmentTemplates = resolveFragments(definition, sourceFile);
-
-  return {
-    ...definition,
-    transformRange,
-    sourceFile,
-    fragmentTemplates,
-  };
+  return new TypeDefinition(definition, getSourceFile);
 };
 
 const parseTypeDefinition = ({ id, stack }: TypeDefinitionInfo, sourceFile: ts.SourceFile) => {
@@ -52,8 +56,11 @@ const parseTypeDefinition = ({ id, stack }: TypeDefinitionInfo, sourceFile: ts.S
   return [factory.getStart(), factory.getEnd()] as const;
 };
 
-const resolveFragments = ({ fragments }: TypeDefinitionInfo, sourceFile: ts.SourceFile) => {
-  const templates = new Map<string, TypeFragmentTemplate>();
+const resolveFragments = (
+  acc: Map<string, TypeFragmentTemplate>,
+  { fragments }: TypeDefinitionInfo,
+  sourceFile: ts.SourceFile,
+) => {
   fragments.forEach((stack, id) => {
     const { nodePath } = getNodeByStack(stack, sourceFile, ts.isCallExpression);
     const nearestCallExpression = nodePath[nodePath.length - 1];
@@ -63,9 +70,8 @@ const resolveFragments = ({ fragments }: TypeDefinitionInfo, sourceFile: ts.Sour
         `Invalid Type Argument Range: 'createTypeFragment' requires 1 type argument, but received ${length} at '${id}'`,
       );
     }
-    templates.set(id, parseFragmentTypeNode(nearestCallExpression.typeArguments[0]));
+    acc.set(id, parseFragmentTypeNode(nearestCallExpression.typeArguments[0]));
   });
-  return templates;
 };
 
 const parseFragmentTypeNode = (
@@ -73,18 +79,19 @@ const parseFragmentTypeNode = (
   sourceText: string = fragmentTypeNode.getSourceFile().getFullText(),
 ): TypeFragmentTemplate => {
   const fragmentText = fragmentTypeNode.getText();
-  const template: string[] = [];
+  const raw: string[] = [];
+  const templateStrings = Object.assign(raw, { raw });
   const substitutions: string[] = [];
   let cursor = fragmentTypeNode.getStart();
   forEachChildDeep(fragmentTypeNode, (node) => {
     if (ts.isTypeQueryNode(node)) {
-      template.push(sourceText.slice(cursor, node.getStart()));
+      templateStrings.push(sourceText.slice(cursor, node.getStart()));
       const dependencyName = node.exprName.getText();
       substitutions.push(dependencyName);
       cursor = node.getEnd();
     }
   });
-  template.push(sourceText.slice(cursor, fragmentTypeNode.getEnd()));
+  templateStrings.push(sourceText.slice(cursor, fragmentTypeNode.getEnd()));
 
-  return { fragmentText, template, substitutions };
+  return { fragmentText, templateStrings, substitutions };
 };

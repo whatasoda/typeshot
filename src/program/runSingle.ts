@@ -1,32 +1,31 @@
 import ts from 'typescript';
 import { runWithContext } from '../context';
-import { TypeInstance, TypeInstanceObject } from '../typeshot';
+import { TypeInstanceObject } from '../typeshot';
 import { resolveTypeInstance } from './resolve-type-instance';
-import { ResolvedTypeDefinition, resolveTypeDefinition } from './resolve-type-definition';
+import { TypeDefinition, resolveTypeDefinition } from './resolve-type-definition';
 import { createIntermediateFiles } from './create-intermediate-files';
 
 export const runSingle = async (fileName: string, sys: ts.System) => {
   const getSourceFile = createSourceFileGetter(sys);
 
   const context = await runWithContext(fileName, {
-    definitions: new Map(),
+    definitionInfoMap: new Map(),
     template: [],
   });
 
-  const resolvedDefinitions = new Map<string, ResolvedTypeDefinition>();
-  context.definitions.forEach((definition) => {
-    resolvedDefinitions.set(definition.id, resolveTypeDefinition(definition, getSourceFile));
+  const definitions = new Map<string, TypeDefinition>();
+  context.definitionInfoMap.forEach((info) => {
+    definitions.set(info.id, resolveTypeDefinition(info, getSourceFile));
   });
 
-  const [typeTokenCollection, addTypeToken] = createTypeTokenCollection(resolvedDefinitions);
   context.template.forEach((content) => {
     if (content instanceof TypeInstanceObject) {
-      addTypeToken(content);
+      resolveTypeInstance(content, definitions);
     }
   });
 
   // WIP
-  return createIntermediateFiles(typeTokenCollection);
+  return createIntermediateFiles(definitions);
 };
 
 const createSourceFileGetter = (sys: ts.System) => {
@@ -44,21 +43,4 @@ const createSourceFileGetter = (sys: ts.System) => {
     cache.set(fileName, sourceFile);
     return sourceFile;
   };
-};
-
-const createTypeTokenCollection = (definitionMap: Map<string, ResolvedTypeDefinition>) => {
-  const collection = new Map<ResolvedTypeDefinition, Map<TypeInstance, string>>();
-  const addTypeToken = (token: TypeInstance) => {
-    const definition = definitionMap.get(token.definitionId);
-    if (!definition) {
-      throw new Error(`Unknown Type Definition: type definition '${token.definitionId}' is not found`);
-    }
-    if (!collection.has(definition)) {
-      collection.set(definition, new Map());
-    }
-    const map = collection.get(definition)!;
-    const result = resolveTypeInstance(token, definition);
-    map.set(token, result);
-  };
-  return [collection, addTypeToken] as const;
 };

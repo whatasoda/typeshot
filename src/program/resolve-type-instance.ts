@@ -1,58 +1,62 @@
 import { FragmentDependencies, TypeKind, TypeInstance } from '../typeshot';
 import { getSymbolName } from '../utils/symbol';
-import type { ResolvedTypeDefinition } from './resolve-type-definition';
+import type { TypeDefinition } from './resolve-type-definition';
 
-export const resolveTypeInstance = (instance: TypeInstance, definition: ResolvedTypeDefinition) => {
-  return resolvePayload(instance.payload, definition);
+export const resolveTypeInstance = (instance: TypeInstance, definitions: Map<string, TypeDefinition>) => {
+  const { definitionId, value } = instance;
+  const definition = definitions.get(definitionId);
+  if (!definition) {
+    throw new Error(`Unknown Type Definition: type definition '${definitionId}' is not found`);
+  }
+  definition.intermediateTypes.set(instance, resolveInstancePayload(value, definition));
 };
 
-const resolvePayload = (payload: any, definition: ResolvedTypeDefinition, resolved: Set<any> = new Set()): string => {
-  switch (payload) {
+const resolveInstancePayload = (value: any, definition: TypeDefinition, resolved: Set<any> = new Set()): string => {
+  switch (value) {
     case null:
       return 'null';
     case void 0:
       return 'undefined';
   }
 
-  const { id: definitionId, fragmentTemplates } = definition;
-  switch (typeof payload) {
+  const { id: definitionId, fragments } = definition;
+  switch (typeof value) {
     case 'boolean':
     case 'string':
     case 'number':
-      return JSON.stringify(payload);
+      return JSON.stringify(value);
     case 'object':
       break;
     default:
-      throw new TypeError(`Unsupported Value Type '${typeof payload}': check type definition '${definitionId}'`);
+      throw new TypeError(`Unsupported Value Type '${typeof value}': check type definition '${definitionId}'`);
   }
 
-  if (resolved.has(payload)) {
+  if (resolved.has(value)) {
     throw new Error(`Unexpected Circular Reference: check type definition '${definitionId}'`);
   }
-  resolved.add(payload);
+  resolved.add(value);
 
-  if (payload instanceof TypeKind.Union) {
-    return payload.members.map((member) => `(${resolvePayload(member, definition)})`).join(' | ');
+  if (value instanceof TypeKind.Union) {
+    return value.members.map((member) => `(${resolveInstancePayload(member, definition)})`).join(' | ');
   }
 
-  if (Array.isArray(payload)) {
-    return `[${payload.map((value) => resolvePayload(value, definition)).join(', ')}]`;
+  if (Array.isArray(value)) {
+    return `[${value.map((value) => resolveInstancePayload(value, definition)).join(', ')}]`;
   }
 
-  const base = Object.getOwnPropertyNames(payload).reduce((acc, key) => {
-    return acc + `${key}: ${resolvePayload(payload[key], definition)};`;
+  const fromValue = Object.getOwnPropertyNames(value).reduce((acc, key) => {
+    return acc + `${key}: ${resolveInstancePayload(value[key], definition)};`;
   }, '');
-
-  const fragments = Object.getOwnPropertySymbols(payload).map((fragmentSymbol) => {
-    const fragmentId = getSymbolName(fragmentSymbol);
-    const fragment = fragmentTemplates.get(fragmentId);
+  const fromFragment = Object.getOwnPropertySymbols(value).map((sym) => {
+    const fragmentId = getSymbolName(sym);
+    const fragment = fragments.get(fragmentId);
     if (!fragment) {
       throw new Error(`Fragment Not Found: check around '${fragmentId}'`);
     }
-    const { template, substitutions } = fragment;
-    const dependencies: FragmentDependencies = payload[fragmentSymbol] || {};
+    const { templateStrings, substitutions } = fragment;
+    const dependencies: FragmentDependencies = value[sym] || {};
     return String.raw(
-      Object.assign(template, { raw: template }),
+      templateStrings,
       ...substitutions.map((dependencyName) => {
         if (!(dependencyName in dependencies)) {
           throw new Error(`Dependency Not Found: dependency ${dependencyName} is missed at '${fragmentId}'`);
@@ -62,5 +66,6 @@ const resolvePayload = (payload: any, definition: ResolvedTypeDefinition, resolv
     );
   });
 
-  return fragments.length ? `{${base}} & (${fragments.join(' & ')})` : `{${base}}`;
+  // TODO: refactor
+  return fromFragment.length ? `{${fromValue}} & (${fromFragment.join(' & ')})` : `{${fromValue}}`;
 };

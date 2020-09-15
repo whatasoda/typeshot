@@ -40,7 +40,7 @@ namespace typeshot {
     public readonly id: string;
     constructor(
       public readonly definitionId: string,
-      public readonly payload: any,
+      public readonly value: any,
       public readonly name: string,
       public readonly format: T,
     ) {
@@ -60,7 +60,7 @@ namespace typeshot {
         stack: definitionStack,
         fragments: new Map(),
       };
-      context.definitions.set(definitionId, definitionInfo);
+      context.definitionInfoMap.set(definitionId, definitionInfo);
 
       return (props: T): TypeInstanceFactory => {
         const { fragments } = definitionInfo;
