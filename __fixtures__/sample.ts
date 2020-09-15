@@ -8,7 +8,7 @@ interface TypeMap {
 interface FieldDefinition {
   id: string;
   type: keyof TypeMap;
-  required: string;
+  required: boolean;
 }
 
 const PropsType = typeshot.registerTypeDefinition((fields: FieldDefinition[], makeType) => {
@@ -28,4 +28,13 @@ const PropsType = typeshot.registerTypeDefinition((fields: FieldDefinition[], ma
   return acc;
 });
 
-PropsType([]);
+const Props = PropsType([
+  { id: 'foo', type: 'number', required: false },
+  { id: 'bar', type: 'number', required: true },
+  { id: 'baz', type: 'text', required: false },
+  { id: 'qux', type: 'text', required: true },
+]);
+
+typeshot.print`
+  ${Props.interface('hoge')}
+`;
