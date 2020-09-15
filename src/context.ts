@@ -11,7 +11,7 @@ export interface TypeshotContext {
 
 const CURRENT_TYPESHOT_CONTEXT = { current: null as null | TypeshotContext };
 
-export const getCurrentContext = () => {
+export const getContext = () => {
   const context = CURRENT_TYPESHOT_CONTEXT.current;
   if (context) return context;
   throw new Error('Context Missed: Make sure to run via typeshot program');

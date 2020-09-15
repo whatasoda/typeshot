@@ -1,4 +1,4 @@
-import { getCurrentContext } from './context';
+import { getContext } from './context';
 import { CodeStack, withStackTracking } from './utils/stack-tracking';
 
 namespace typeshot {
@@ -34,17 +34,23 @@ namespace typeshot {
   }
   export type TypeToken = TypeTokenObject<'alias'> | TypeTokenObject<'interface'> | TypeTokenObject<'literal'>;
   export class TypeTokenObject<T extends 'alias' | 'interface' | 'literal'> {
+    public readonly id: string;
     constructor(
       public readonly definitionId: string,
       public readonly payload: any,
       public readonly name: string,
       public readonly format: T,
-    ) {}
+    ) {
+      const ID = tokenNextIdMap.get(definitionId) || 0;
+      this.id = `${ID}`;
+      tokenNextIdMap.set(definitionId, ID + 1);
+    }
   }
+  const tokenNextIdMap = new Map<string, number>();
 
   export const registerTypeDefinition: RegisterTypeDefinition = withStackTracking(
     <T extends object>(definitionStack: CodeStack, factory: TypeDefinitionFactory<T>) => {
-      const context = getCurrentContext();
+      const context = getContext();
       const definitionId = `definition@${definitionStack.composed}`;
       const definition: TypeDefinition = {
         id: definitionId,
@@ -84,7 +90,7 @@ namespace typeshot {
   export type ResolvedTemplateArray = (string | TypeToken)[];
 
   export const print = (templateArray: TemplateStringsArray, ...substitutions: TemplateSubtitutionsArray): void => {
-    const context = getCurrentContext();
+    const context = getContext();
     reduceTaggedTemplate(context.template, templateArray, substitutions);
   };
 
@@ -120,7 +126,7 @@ namespace typeshot {
     output?: string;
   }
   export const config = (config: Config): ((...args: Parameters<typeof String.raw>) => void) => {
-    const context = getCurrentContext();
+    const context = getContext();
 
     context.config = context.config || config;
     return (...args) => {

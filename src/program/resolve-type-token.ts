@@ -2,12 +2,8 @@ import { TypeDependencies, TypeKind, TypeToken } from '../typeshot';
 import { getSymbolName } from '../utils/symbol';
 import type { ResolvedTypeDefinition } from './resolve-type-definition';
 
-export const hydrateTypeToken = (token: TypeToken, typeDefinitionMap: Map<string, ResolvedTypeDefinition>) => {
-  const { definitionId, payload } = token;
-  const definition = typeDefinitionMap.get(definitionId);
-  if (!definition) throw new Error(`Type Definition Not Found: type definition '${definitionId}' is not found`);
-
-  return resolvePayload(payload, definition);
+export const resolveTypeToken = (token: TypeToken, definition: ResolvedTypeDefinition) => {
+  return resolvePayload(token.payload, definition);
 };
 
 const resolvePayload = (payload: any, definition: ResolvedTypeDefinition, resolved: Set<any> = new Set()): string => {
