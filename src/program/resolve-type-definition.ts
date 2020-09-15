@@ -1,8 +1,10 @@
 import ts from 'typescript';
 import type { TypeDefinition } from '../registerTypeDefinition';
-import { getNodeByStack } from '../utils/source-file-search';
+import { getNodeByStack, getSourceFileByStack } from '../utils/source-file-search';
 
 export interface ResolvedTypeDefinition extends TypeDefinition {
+  range: readonly [number, number];
+  sourceFile: ts.SourceFile;
   fragmentTemplates: Record<string, TypeFragmentTemplate>;
 }
 
@@ -16,24 +18,51 @@ export const resolveTypeDefinition = (
   definition: TypeDefinition,
   getSourceFile: (filename: string) => ts.SourceFile | null,
 ): ResolvedTypeDefinition => {
-  const fragmentTypeNodes = Object.entries(definition.fragmentStacks).reduce<Record<string, TypeFragmentTemplate>>(
+  const sourceFile = getSourceFileByStack(definition.stack, getSourceFile);
+  const range = parseTypeDefinition(definition, sourceFile);
+
+  const fragmentTemplates = Object.entries(definition.fragmentStacks).reduce<Record<string, TypeFragmentTemplate>>(
     (acc, [id, fragmentStack]) => {
-      // TODO: increase performance by getting source file in advance
-      const { ancestors } = getNodeByStack(fragmentStack, getSourceFile, ts.isCallExpression);
-      const nearestCallExpression = ancestors[ancestors.length - 1];
+      const { nodePath } = getNodeByStack(fragmentStack, sourceFile, ts.isCallExpression);
+      const nearestCallExpression = nodePath[nodePath.length - 1];
       if (!nearestCallExpression.typeArguments || nearestCallExpression.typeArguments.length !== 1) {
         const length = nearestCallExpression.typeArguments?.length || 0;
         throw new RangeError(
-          `Invalid Type Argument Range: 'createTypeFragment' requires 1 type argument, but received ${length} at ${id}`,
+          `Invalid Type Argument Range: 'createTypeFragment' requires 1 type argument, but received ${length} at '${id}'`,
         );
       }
-
       acc[id] = parseFragmentTypeNode(nearestCallExpression.typeArguments[0]);
       return acc;
     },
     {},
   );
-  return { ...definition, fragmentTemplates: fragmentTypeNodes };
+
+  return {
+    ...definition,
+    range,
+    sourceFile,
+    fragmentTemplates,
+  };
+};
+
+const parseTypeDefinition = ({ id, stack }: TypeDefinition, sourceFile: ts.SourceFile) => {
+  const { nodePath } = getNodeByStack(stack, sourceFile, ts.isCallExpression);
+  const nearestCallExpression = nodePath[nodePath.length - 1];
+  const argumentLength = nearestCallExpression.arguments.length;
+  if (nearestCallExpression.arguments.length !== 1) {
+    throw new RangeError(
+      `Invalid Argument Range: 'createTypeDefinition' requires 1 argument, but received ${argumentLength} at '${id}'`,
+    );
+  }
+
+  const factory = nearestCallExpression.arguments[0];
+  if (!ts.isFunctionExpression(factory) && !ts.isArrowFunction(factory)) {
+    throw new TypeError(
+      `Invalid Argument: 'createTypeDefinition' requires simple function as an argument, check '${id}'`,
+    );
+  }
+
+  return [factory.getStart(), factory.getEnd()] as const;
 };
 
 const parseFragmentTypeNode = (
