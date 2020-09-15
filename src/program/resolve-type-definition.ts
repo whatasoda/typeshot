@@ -12,6 +12,8 @@ export class TypeDefinition {
   public readonly sourceFile: ts.SourceFile;
   public readonly fragments: Map<string, TypeFragmentTemplate> = new Map();
   public readonly intermediateTypes: Map<TypeInstance, string> = new Map();
+  public readonly intermediateContent: string = '() => {}';
+  public readonly intermediateFilePosition: { readonly start: number; readonly end: number } | null = null;
 
   constructor(definition: TypeDefinitionInfo, getSourceFile: (filename: string) => ts.SourceFile | null) {
     this.id = definition.id;
@@ -19,6 +21,20 @@ export class TypeDefinition {
     this.sourceFile = getSourceFileByStack(definition.stack, getSourceFile);
     [this.start, this.end] = parseTypeDefinition(definition, this.sourceFile);
     resolveFragments(this.fragments, definition, this.sourceFile);
+  }
+
+  public prepareIntermediateContent() {
+    let acc: string = '';
+    this.intermediateTypes.forEach((typeString, token) => {
+      acc += `${token.id}: ${typeString};`;
+    });
+    const intermediateContent = `() => {type _ = {${acc}};}`;
+    Object.assign(this, { intermediateContent });
+  }
+
+  public setIntermediatePosition(start: number) {
+    const end = start + this.intermediateContent.length;
+    Object.assign(this, { intermediateFilePosition: { start, end } });
   }
 }
 
