@@ -1,5 +1,4 @@
-import type { TypeDependencies, TypeToken } from '../registerTypeDefinition';
-import { ParameterKind } from '../typeshot';
+import { TypeDependencies, TypeKind, TypeToken } from '../typeshot';
 import { getSymbolName } from '../utils/symbol';
 import type { ResolvedTypeDefinition } from './resolve-type-definition';
 
@@ -36,22 +35,19 @@ const resolvePayload = (payload: any, definition: ResolvedTypeDefinition, resolv
   }
   resolved.add(payload);
 
-  if (payload instanceof ParameterKind.Union) {
-    return payload.param.map((member) => `(${resolvePayload(member, definition)})`).join(' | ');
-  }
-  if (payload instanceof ParameterKind.Intersection) {
-    return payload.param.map((member) => `(${resolvePayload(member, definition)})`).join(' & ');
+  if (payload instanceof TypeKind.Union) {
+    return payload.members.map((member) => `(${resolvePayload(member, definition)})`).join(' | ');
   }
 
   if (Array.isArray(payload)) {
     return `[${payload.map((value) => resolvePayload(value, definition)).join(', ')}]`;
   }
 
-  const baseProperties = Object.getOwnPropertyNames(payload).reduce((acc, key) => {
+  const base = Object.getOwnPropertyNames(payload).reduce((acc, key) => {
     return acc + `${key}: ${resolvePayload(payload[key], definition)};`;
   }, '');
 
-  const hydratedFragments = Object.getOwnPropertySymbols(payload).map((fragmentSymbol) => {
+  const fragments = Object.getOwnPropertySymbols(payload).map((fragmentSymbol) => {
     const fragmentId = getSymbolName(fragmentSymbol);
     const fragment = fragmentTemplates[fragmentId];
     if (!fragment) {
@@ -61,14 +57,14 @@ const resolvePayload = (payload: any, definition: ResolvedTypeDefinition, resolv
     const dependencies: TypeDependencies = payload[fragmentSymbol] || {};
     return String.raw(
       Object.assign(template, { raw: template }),
-      ...substitutions.map((depName) => {
-        if (!(depName in dependencies)) {
-          throw new Error(`Dependency Not Found: dependency ${depName} is missed at '${fragmentId}'`);
+      ...substitutions.map((dependencyName) => {
+        if (!(dependencyName in dependencies)) {
+          throw new Error(`Dependency Not Found: dependency ${dependencyName} is missed at '${fragmentId}'`);
         }
-        return JSON.stringify(dependencies[depName]);
+        return JSON.stringify(dependencies[dependencyName]);
       }),
     );
   });
 
-  return `{${baseProperties}} & (${hydratedFragments})`;
+  return fragments.length ? `{${base}} & (${fragments.join(' & ')})` : `{${base}}`;
 };

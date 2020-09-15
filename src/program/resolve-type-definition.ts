@@ -1,5 +1,5 @@
 import ts from 'typescript';
-import type { TypeDefinition } from '../registerTypeDefinition';
+import { TypeDefinition } from '../typeshot';
 import { getNodeByStack, getSourceFileByStack } from '../utils/source-file-search';
 
 export interface ResolvedTypeDefinition extends TypeDefinition {

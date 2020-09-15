@@ -1,159 +1,110 @@
-import ts from 'typescript';
-import { getCurrentContext, TypeshotContext } from './context';
-import { injectTypeParameters } from './type-injection';
-import { evaluateTaggedTemplate } from './tagged-template';
-
-const ASTFactories = ts;
-type ASTFactories = typeof ts;
-const assertContext: (context: TypeshotContext | null) => asserts context is TypeshotContext = (context) => {
-  if (!context) throw new Error('Missing context! You cannot run typeshot globals without typeshot program.');
-};
+import { getCurrentContext } from './context';
+import { CodeStack, withStackTracking } from './utils/stack-tracking';
+// import { evaluateTaggedTemplate } from './tagged-template';
 
 namespace typeshot {
-  export type T = any; // dynamic type parameter
-
   export type Typeshot = typeof typeshot;
-  /*
-  
-  Parameter
-  
-  */
-  export type TypeParameter<T = any> =
-    | ParameterKind.Solo<T>
-    | ParameterKind.Union<T>
-    | ParameterKind.Intersection<T>
-    | ts.TypeNode;
-  export type SingleParameterFactory<P> = (props: P, ts: ASTFactories) => TypeParameter;
-  export type MultipleParameterFactory<P> = (props: P, ts: ASTFactories) => TypeParameter[];
-  export type ParameterFactory<P> = MultipleParameterFactory<P> | SingleParameterFactory<P>[];
 
-  export const solo = <T>(parameter: T) => new ParameterKind.Solo<T>(parameter);
-  export const union = <T>(parameter: T[]) => new ParameterKind.Union<T>(parameter);
-  export const intersection = <T>(parameter: T[]) => new ParameterKind.Intersection<T>(parameter);
-
-  export namespace ParameterKind {
-    export class Solo<T = any> {
-      constructor(public readonly param: T) {}
-    }
+  export const union = <T>(members: T[]) => new TypeKind.Union<T>(members);
+  export namespace TypeKind {
     export class Union<T = any> {
-      constructor(public readonly param: T[]) {}
-    }
-    export class Intersection<T = any> {
-      constructor(public readonly param: T[]) {}
+      constructor(public readonly members: T[]) {}
     }
   }
-  export const createPrameter = <T, P>(factory: (props: P, ts: ASTFactories) => TypeParameter<T>) => factory;
 
-  /*
-  
-  Type
-  
-  */
-  export type TypeToken = TokenObject<'alias'> | TokenObject<'interface'> | TokenObject<'literal'>;
-  export class TokenObject<T extends 'alias' | 'interface' | 'literal'> {
-    constructor(public readonly id: string, public readonly name: string, public readonly format: T) {}
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  export type CreateTypeFragment = <_>(deps: TypeDependencies) => Readonly<TypeFragment>;
+  export type TypeFragmentStacks = Record<string, CodeStack>;
+  export type TypeFragment = Record<symbol, TypeDependencies>;
+  export type TypeDependencies = Record<string, any>;
+
+  export interface TypeDefinition {
+    id: string;
+    stack: CodeStack;
+    fragmentStacks: TypeFragmentStacks;
   }
-  export interface TypeTokenFactory<P> {
-    (props: P): {
-      readonly props: P;
-      alias(name: string): TypeToken;
-      interface(name: string): TypeToken;
-      literal(): TypeToken;
-      property(property: string | number, name: string): PropertyTypeTokenMap;
-      mapArray(names: string[]): PropertyTypeTokenMap[];
-      mapRecord<T extends string>(names: Record<T, string>): Record<T, PropertyTypeTokenMap>;
-    };
+  export type TypeDefinitionFactory<T extends object> = (props: T, createTypeFragment: CreateTypeFragment) => any;
+  export type RegisterTypeDefinition = {
+    <T extends object>(factory: TypeDefinitionFactory<T>): (props: T) => TypeTokenFactory;
+  };
+
+  export interface TypeTokenFactory {
+    alias(name: string): TypeToken;
+    interface(name: string): TypeToken;
+    literal(): TypeToken;
   }
-  export interface PropertyTypeTokenMap {
-    readonly property: string | number;
-    readonly name: string;
-    readonly alias: TokenObject<'alias'>;
-    readonly interface: TokenObject<'interface'>;
-    readonly literal: TokenObject<'literal'>;
+  export type TypeToken = TypeTokenObject<'alias'> | TypeTokenObject<'interface'> | TypeTokenObject<'literal'>;
+  export class TypeTokenObject<T extends 'alias' | 'interface' | 'literal'> {
+    constructor(
+      public readonly definitionId: string,
+      public readonly payload: any,
+      public readonly name: string,
+      public readonly format: T,
+    ) {}
   }
 
-  const _createType = <_, P = {}>(parameterFactory: ParameterFactory<P>, rootId: string): TypeTokenFactory<P> => {
-    const context = getCurrentContext();
-    assertContext(context);
-
-    const info = context.getType(rootId);
-    if (!info) throw new Error(`No correspond dynamic type entry for '${rootId}' found.`);
-
-    let count = 0;
-
-    const factory: TypeTokenFactory<P> = (props) => {
-      const parameters = Array.isArray(parameterFactory)
-        ? parameterFactory.map((factory) => factory(props, ASTFactories))
-        : parameterFactory(props, ASTFactories);
-      const type = injectTypeParameters(typeshot, parameters, info.type);
-      const selfId = `${rootId}-${count++}`;
-
-      const requestSelf = (name: string, format: TypeToken['format']) => {
-        if (!context.requests.has(selfId)) context.requests.set(selfId, { id: selfId, type });
-        return new TokenObject(selfId, name, format);
+  export const registerTypeDefinition: RegisterTypeDefinition = withStackTracking(
+    <T extends object>(definitionStack: CodeStack, factory: TypeDefinitionFactory<T>) => {
+      const context = getCurrentContext();
+      const definitionId = `definition@${definitionStack.composed}`;
+      const definition: TypeDefinition = {
+        id: definitionId,
+        stack: definitionStack,
+        fragmentStacks: Object.create(null),
       };
+      context.definitions.set(definitionId, definition);
 
-      const requestProperty = (property: string | number, name: string): PropertyTypeTokenMap => {
-        const propertyId = `${selfId}-${property}`;
-        if (!context.requests.has(propertyId)) context.requests.set(propertyId, { id: propertyId, type, property });
+      return (props: T) => {
+        const { fragmentStacks } = definition;
+        const createTypeFragment: CreateTypeFragment = withStackTracking(
+          (fragmentStack, dependencies): TypeFragment => {
+            // TODO: put some comment
+            const fragmentId = `fragment@${fragmentStack.composed}`;
+            const fragmentSymbol = Symbol(fragmentId);
+            fragmentStacks[fragmentId] = fragmentStack;
+
+            const fragment: TypeFragment = Object.create(null);
+            return Object.freeze(Object.assign(fragment, { [fragmentSymbol]: dependencies }));
+          },
+        );
+
+        const payload = factory(props, createTypeFragment);
+        const common = [definitionId, payload] as const;
 
         return {
-          property,
-          name,
-          alias: new TokenObject(propertyId, name, 'alias'),
-          interface: new TokenObject(propertyId, name, 'interface'),
-          literal: new TokenObject(propertyId, name, 'literal'),
+          alias: (name) => new TypeTokenObject(...common, name, 'alias'),
+          interface: (name) => new TypeTokenObject(...common, name, 'interface'),
+          literal: () => new TypeTokenObject(...common, 'NO_NAME', 'literal'),
         };
       };
+    },
+  );
 
-      return {
-        props,
-        alias: (name) => requestSelf(name, 'alias'),
-        interface: (name) => requestSelf(name, 'interface'),
-        literal: () => requestSelf('NO_NAME', 'literal'),
-        property: requestProperty,
-        mapArray: (names) => names.map((name, property) => requestProperty(property, name)),
-        mapRecord: (names) => {
-          return Object.keys(names).reduce<Record<string, PropertyTypeTokenMap>>((acc, property) => {
-            acc[property] = requestProperty(property, names[property as keyof typeof names]);
-            return acc;
-          }, {});
-        },
-      };
-    };
+  // /*
 
-    return factory;
-  };
-  // The rootId will auto matically injected.
-  export const createType = _createType as <_, P = {}>(parameterFactory: ParameterFactory<P>) => TypeTokenFactory<P>;
+  // Printer
 
-  /*
-  
-  Printer
-  
-  */
-  export type StaticSubtitution = string | number | boolean | undefined | null | TypeToken;
-  export type FunctionSubstitution<P> = (props: P) => StaticSubtitution | DynamicSubtitution<P>[];
-  export type DynamicSubtitution<P> = StaticSubtitution | FunctionSubstitution<P>;
-  export type ResolvedTemplate = string | TypeToken;
+  // */
+  // export type StaticSubtitution = string | number | boolean | undefined | null;
+  // export type FunctionSubstitution<P> = (props: P) => StaticSubtitution | DynamicSubtitution<P>[];
+  // export type DynamicSubtitution<P> = StaticSubtitution | FunctionSubstitution<P>;
+  // export type ResolvedTemplate = string;
 
-  export const print = (template: TemplateStringsArray, ...substitutions: StaticSubtitution[]) => {
-    const context = getCurrentContext();
-    assertContext(context);
-    evaluateTaggedTemplate(template, substitutions, null, context.template);
-  };
+  // export const print = (template: TemplateStringsArray, ...substitutions: StaticSubtitution[]) => {
+  //   const context = getCurrentContext();
+  //   evaluateTaggedTemplate(template, substitutions, null, context.template);
+  // };
 
-  export const createPrinter = <P>(template: TemplateStringsArray, ...substitutions: DynamicSubtitution<P>[]) => {
-    return (props: P) => {
-      const context = getCurrentContext();
-      assertContext(context);
-      evaluateTaggedTemplate(template, substitutions, props, context.template);
-    };
-  };
+  // export const createPrinter = <P>(template: TemplateStringsArray, ...substitutions: DynamicSubtitution<P>[]) => {
+  //   return (props: P) => {
+  //     const context = getCurrentContext();
+  //     evaluateTaggedTemplate(template, substitutions, props, context.template);
+  //   };
+  // };
 
-  export const createTemplate = <P>(template: TemplateStringsArray, ...substitutions: DynamicSubtitution<P>[]) => {
-    return evaluateTaggedTemplate(template, substitutions, null, []);
-  };
+  // export const createTemplate = <P>(template: TemplateStringsArray, ...substitutions: DynamicSubtitution<P>[]) => {
+  //   return evaluateTaggedTemplate(template, substitutions, null, []);
+  // };
 
   /*
   
@@ -165,7 +116,6 @@ namespace typeshot {
   }
   export const config = (config: Config): ((...args: Parameters<typeof String.raw>) => void) => {
     const context = getCurrentContext();
-    assertContext(context);
 
     context.config = context.config || config;
     return (...args) => {

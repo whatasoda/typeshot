@@ -1,16 +1,13 @@
 import ts from 'typescript';
-import path from 'path';
-import { Module } from 'module';
-import type { Config, TypeToken } from './typeshot';
-import type { TypeDefinition } from './registerTypeDefinition';
+import { REGISTER_INSTANCE, register, RegisterOptions } from 'ts-node';
+import type { Config, TypeDefinition, TypeToken } from './typeshot';
 
 export interface TypeshotContext {
-  readonly getType: (id: string) => TypeInformation | undefined;
   readonly definitions: Map<string, TypeDefinition>;
-  readonly requests: Map<string, TypeRequest>;
   readonly template: (string | TypeToken)[];
   header?: string;
   config?: Config;
+  promise?: Promise<void>;
 }
 
 export interface TypeInformation {
@@ -32,31 +29,24 @@ export const getCurrentContext = () => {
   throw new Error('Context Missed: Make sure to run via typeshot program');
 };
 
-const parent = module;
-const runSourceWithContext = (
-  source: ts.SourceFile,
-  sourceText: string,
-  options: ts.CompilerOptions,
+const runWithContext = async (
+  filename: string,
   context: TypeshotContext,
-): TypeshotContext => {
-  const prev = CURRENT_TYPESHOT_CONTEXT.current;
+  registerOptions?: RegisterOptions,
+): Promise<TypeshotContext> => {
+  if (CURRENT_TYPESHOT_CONTEXT.current) {
+    throw new Error('Invalid Operation: typeshot cannot evaluate multiple files at the same time in the same context');
+  }
   try {
-    const { fileName: filename } = source;
-    const script = ts.transpile(sourceText, options);
+    if (!(REGISTER_INSTANCE in process)) register(registerOptions);
     CURRENT_TYPESHOT_CONTEXT.current = context;
-
-    // https://github.com/nodejs/node/blob/6add5b31fcc4ae45a8603f886477c544a99e0188/lib/internal/bootstrap_node.js#L415
-    const module = new Module(filename, parent);
-    module.filename = filename;
-    module.paths = (Module as any)._nodeModulePaths(path.dirname(filename));
-    (module as any)._compile(script, filename);
+    require(filename);
+    await context.promise;
   } catch (e) {
     // eslint-disable-next-line no-console
     console.log(e);
-  } finally {
-    CURRENT_TYPESHOT_CONTEXT.current = prev;
   }
   return context;
 };
 
-export default runSourceWithContext;
+export default runWithContext;
