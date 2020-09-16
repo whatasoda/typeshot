@@ -1,27 +1,37 @@
 import ts from 'typescript';
+import path from 'path';
 import { runWithContext } from '../context';
-import { TypeInstanceObject } from '../typeshot';
+import { SourceTrace, TypeInstanceObject } from '../typeshot';
 import { resolveTypeInstance } from './resolve-type-instance';
 import { TypeDefinition, resolveTypeDefinition, resolveIntermediateDefinition } from './resolve-type-definition';
 import { createIntermediateFiles } from './create-intermediate-files';
 import { createTsProgram } from '../utils/ts-program';
-import { resolveCustomContent } from './resolve-custom-content';
+import { resolveSourceTrace, serializeSourceTrace } from './resolve-source-trace';
+import { collectImportPathTransform } from './collect-import-path-transform';
 
 export interface TypeshotOptions {
   basePath?: string;
   project?: string;
 }
 
-export const runSingle = async (targetFileName: string, sys: ts.System, options: TypeshotOptions = {}) => {
-  const getSourceFile = createSourceFileGetter(sys);
-  const targetSourceFile = getSourceFile(targetFileName);
-  if (!targetSourceFile) throw new Error(`File Not Found: target file ${targetFileName} is not found`);
+export const runSingle = async (
+  sourceFileName: string,
+  outputFileName: string,
+  sys: ts.System,
+  options: TypeshotOptions = {},
+) => {
+  const { basePath = process.cwd(), project = 'tsconfig.json' } = options;
+  sourceFileName = path.isAbsolute(sourceFileName) ? sourceFileName : path.resolve(basePath, sourceFileName);
+  outputFileName = path.isAbsolute(outputFileName) ? outputFileName : path.resolve(basePath, outputFileName);
 
-  const context = await runWithContext(targetFileName, {
+  const getSourceFile = createSourceFileGetter(sys);
+  const targetFile = getSourceFile(sourceFileName);
+  if (!targetFile) throw new Error(`File Not Found: target file ${sourceFileName} is not found`);
+
+  const context = await runWithContext(sourceFileName, {
     definitionInfoMap: new Map(),
     template: [],
-    header: null,
-    footer: null,
+    pendingTrace: null,
   });
 
   const definitions = new Map<string, TypeDefinition>();
@@ -32,11 +42,12 @@ export const runSingle = async (targetFileName: string, sys: ts.System, options:
   context.template.forEach((content) => {
     if (content instanceof TypeInstanceObject) {
       resolveTypeInstance(content, definitions);
+    } else if (content instanceof SourceTrace) {
+      resolveSourceTrace(targetFile, content);
     }
   });
 
   const intermediateFiles = createIntermediateFiles(definitions);
-  const { basePath = process.cwd(), project = 'tsconfig.json' } = options;
 
   const { program, checker, printer } = createTsProgram(basePath, project, sys, (readFile, path, encoding) => {
     return intermediateFiles.get(path) || readFile(path, encoding);
@@ -45,18 +56,21 @@ export const runSingle = async (targetFileName: string, sys: ts.System, options:
     resolveIntermediateDefinition(definition, program, checker, printer);
   });
 
+  const sourceText = targetFile.getFullText();
+  const sourceDir = path.parse(sourceFileName).dir;
+  const outputDir = path.parse(outputFileName).dir;
+  const transforms = collectImportPathTransform([], targetFile, sourceDir, outputDir);
+
   let acc = '';
-  acc += resolveCustomContent(context.header, targetSourceFile);
   context.template.forEach((content) => {
     if (content instanceof TypeInstanceObject) {
-      const type = definitions.get(content.definitionId)?.types.get(content.id);
-      if (!type) throw new Error('');
-      acc += type;
+      acc += definitions.get(content.definitionId)?.types.get(content.id);
+    } else if (content instanceof SourceTrace) {
+      acc += serializeSourceTrace(sourceText, content, transforms);
     } else {
       acc += content;
     }
   });
-  acc += resolveCustomContent(context.footer, targetSourceFile);
 
   console.log(acc);
 

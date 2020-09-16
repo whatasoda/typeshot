@@ -4,6 +4,7 @@ export const reduceTaggedTemplate = <T, U>(
   substitutions: U[],
   stringify: (substitution: U) => string | T,
 ) => {
+  if (!templateArray.length) return acc;
   let pointer = acc.length;
   acc[pointer] = templateArray[0];
   for (let i = 0, length = substitutions.length; i < length; i++) {

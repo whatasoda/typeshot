@@ -92,7 +92,7 @@ namespace typeshot {
 
   /* Printer */
   export type PrinterSubtitution = string | number | boolean | undefined | null | TypeInstance;
-  export type PrinterTemplate = (string | TypeInstance)[];
+  export type PrinterTemplate = (string | TypeInstance | SourceTrace)[];
   const stringifySubstitution = (substitution: PrinterSubtitution): PrinterTemplate[number] => {
     if (substitution instanceof TypeInstanceObject) {
       return substitution;
@@ -110,36 +110,40 @@ namespace typeshot {
     return reduceTaggedTemplate([], templateArray, substitutions, stringifySubstitution);
   };
 
-  /* Custom Content */
-  export type CustomContentTemplate = (string | (() => string))[];
-  export interface CustomContent {
-    type: 'header' | 'footer';
-    leadingStack: CodeStack;
-    leadingContent: CustomContentTemplate;
-    tailingStack?: CodeStack;
-    tailingContent?: CustomContentTemplate;
+  /* Source Trace */
+  export type TraceBreakTemplate = (string | (() => string))[];
+  export interface TraceBreak {
+    stack: CodeStack;
+    content: TraceBreakTemplate;
+  }
+  export class SourceTrace {
+    public start: number = 0;
+    public end: number = 0;
+    constructor(public readonly leadingTrace: TraceBreak, public readonly tailingTrace: TraceBreak) {}
   }
 
-  const createCustomContentFunc = (type: 'header' | 'footer') => {
-    return withStackTracking((stack, template: TemplateStringsArray, ...substitutions: CustomContentTemplate) => {
+  const emptyTemplateStrings: TemplateStringsArray = Object.assign([], { raw: [] });
+  export const openTrace = withStackTracking(
+    (stack, template: TemplateStringsArray = emptyTemplateStrings, ...substitutions: TraceBreakTemplate) => {
       const context = getContext();
-      if (context[type]) throw new Error(`Make sure to define leading contents of ${type} only once`);
-      const content: CustomContent = (context[type] = {
-        type,
-        leadingStack: stack,
-        leadingContent: reduceTaggedTemplate([], template, substitutions, (s) => s),
-      });
+      if (context.pendingTrace) throw new Error('Make sure to close existing trace before opening another trace');
 
-      return withStackTracking((stack, template: TemplateStringsArray, ...substitutions: CustomContentTemplate) => {
-        if (content.tailingContent) throw new Error(`Make sure to define tailing contents of ${type} only once`);
-        content.tailingStack = stack;
-        content.tailingContent = reduceTaggedTemplate([], template, substitutions, (s) => s);
-      });
-    });
-  };
+      const content = reduceTaggedTemplate([], template, substitutions, (s) => s);
+      context.pendingTrace = { stack, content };
+    },
+  );
 
-  export const header = createCustomContentFunc('header');
-  export const footer = createCustomContentFunc('footer');
+  export const closeTrace = withStackTracking(
+    (stack, template: TemplateStringsArray = emptyTemplateStrings, ...substitutions: TraceBreakTemplate) => {
+      const context = getContext();
+      if (!context.pendingTrace) throw new Error(`Make sure to open trace before closing trace`);
+
+      const content = reduceTaggedTemplate([], template, substitutions, (s) => s);
+      const tailingTrace: TraceBreak = { stack, content };
+      context.template.push(new SourceTrace(context.pendingTrace, tailingTrace));
+      context.pendingTrace = null;
+    },
+  );
 }
 
 export = typeshot;

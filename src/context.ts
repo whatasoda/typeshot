@@ -1,11 +1,10 @@
 import { REGISTER_INSTANCE, register, RegisterOptions } from 'ts-node';
-import type { CustomContent, PrinterTemplate, TypeDefinitionInfo } from './typeshot';
+import type { PrinterTemplate, TraceBreak, TypeDefinitionInfo } from './typeshot';
 
 export interface TypeshotContext {
   readonly definitionInfoMap: Map<string, TypeDefinitionInfo>;
   readonly template: PrinterTemplate;
-  header: CustomContent | null;
-  footer: CustomContent | null;
+  pendingTrace: TraceBreak | null;
   promise?: Promise<void>;
 }
 
