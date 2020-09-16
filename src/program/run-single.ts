@@ -4,12 +4,14 @@ import prettier from 'prettier';
 import { SourceTrace, TypeInstanceObject } from '../typeshot';
 import { runWithContext } from '../context';
 import { createTsProgram } from '../utils/ts-program';
+import { ensureAbsolutePath } from '../utils/converters';
 import { resolveTypeInstance } from './resolve-type-instance';
+import { emitIntermediateFiles } from './emit-intermediate-file';
 import { createIntermediateFiles } from './create-intermediate-files';
 import { collectImportPathTransform } from './collect-import-path-transform';
 import { resolveSourceTrace, serializeSourceTrace } from './resolve-source-trace';
 import { TypeDefinition, resolveTypeDefinition, resolveIntermediateDefinition } from './resolve-type-definition';
-import { emitIntermediateFiles } from './emit-intermediate-file';
+import { formatSafely } from '../utils/format-safely';
 
 export interface TypeshotOptions {
   sourceFileName: string;
@@ -72,7 +74,7 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
     }
   });
 
-  sys.writeFile(outputFileName, safeFormat(result, basePath, options.prettierOptions));
+  sys.writeFile(outputFileName, formatSafely(result, basePath, options.prettierOptions));
   // TODO: log complete message
   if (options.emitIntermediateFiles) {
     emitIntermediateFiles(
@@ -100,22 +102,4 @@ const createSourceFileGetter = (sys: ts.System) => {
     cache.set(fileName, sourceFile);
     return sourceFile;
   };
-};
-
-const ensureAbsolutePath = (raw: string, basePath: string) => {
-  return path.isAbsolute(raw) ? raw : path.resolve(basePath, raw);
-};
-
-const defaultPrettierOptions: prettier.Options = {
-  parser: 'typescript',
-};
-const safeFormat = (raw: string, basePath: string, options: prettier.Options | undefined) => {
-  try {
-    options = options || prettier.resolveConfig.sync(basePath) || defaultPrettierOptions;
-    return prettier.format(raw, options);
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.log(e);
-    return raw;
-  }
 };
