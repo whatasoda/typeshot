@@ -1,6 +1,6 @@
 import ts from 'typescript';
 import { SourceTrace } from '../typeshot';
-import { getNodeByStack } from '../utils/source-file-search';
+import { getNodeByStack } from '../utils/ast';
 
 export type TraceTransformHoleyArray = TraceTransform[] & { [index: number]: TraceTransform | undefined };
 export interface TraceTransform {

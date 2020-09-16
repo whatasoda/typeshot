@@ -1,8 +1,7 @@
 import ts from 'typescript';
 import { TypeDefinitionInfo, TypeInstance } from '../typeshot';
-import { getNodeByPosition, getNodeByStack, getSourceFileByStack } from '../utils/source-file-search';
 import { CodeStack } from '../utils/stack-tracking';
-import { forEachChildDeep } from '../utils/for-each-child-deep';
+import { forEachChildDeep, getNodeByPosition, getNodeByStack, getSourceFileByStack } from '../utils/ast';
 
 interface TypeFragmentTemplate {
   fragmentText: string;

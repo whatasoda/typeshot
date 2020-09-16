@@ -1,4 +1,4 @@
-import ts from 'typescript';
+import type ts from 'typescript';
 import type { CodeStack } from './stack-tracking';
 
 export const getSourceFileByStack = (stack: CodeStack, getSourceFile: (filename: string) => ts.SourceFile | null) => {
@@ -57,4 +57,13 @@ export const getNodeByPosition = <T extends ts.Node = ts.Node>(
     }
   }
   throw new Error('Node Not Found: something wrong happened');
+};
+
+export const forEachChildDeep = (root: ts.Node, callback: (node: ts.Node) => void) => {
+  const queue: ts.Node[] = [root];
+  while (queue.length) {
+    const node = queue.shift()!;
+    callback(node);
+    node.forEachChild((child) => void queue.push(child));
+  }
 };

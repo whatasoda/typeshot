@@ -1,6 +1,6 @@
 import ts from 'typescript';
 import { getFixtures } from '../../../test-utils/getFixtures';
-import { getNodeByStack, getSourceFileByStack } from '../source-file-search';
+import { getNodeByStack, getSourceFileByStack } from '../ast';
 import { CodeStack } from '../stack-tracking';
 
 const fixtrue = getFixtures('sample', true);

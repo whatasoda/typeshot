@@ -1,6 +1,6 @@
 import ts from 'typescript';
 import path from 'path';
-import { forEachChildDeep } from '../utils/for-each-child-deep';
+import { forEachChildDeep } from '../utils/ast';
 import { TraceTransform, TraceTransformHoleyArray } from './resolve-source-trace';
 
 export const collectImportPathTransform = (
