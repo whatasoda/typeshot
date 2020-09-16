@@ -1,14 +1,15 @@
 import ts from 'typescript';
-import prettier from 'prettier';
 import path from 'path';
-import { runWithContext } from '../context';
+import prettier from 'prettier';
 import { SourceTrace, TypeInstanceObject } from '../typeshot';
-import { resolveTypeInstance } from './resolve-type-instance';
-import { TypeDefinition, resolveTypeDefinition, resolveIntermediateDefinition } from './resolve-type-definition';
-import { createIntermediateFiles } from './create-intermediate-files';
+import { runWithContext } from '../context';
 import { createTsProgram } from '../utils/ts-program';
-import { resolveSourceTrace, serializeSourceTrace } from './resolve-source-trace';
+import { resolveTypeInstance } from './resolve-type-instance';
+import { createIntermediateFiles } from './create-intermediate-files';
 import { collectImportPathTransform } from './collect-import-path-transform';
+import { resolveSourceTrace, serializeSourceTrace } from './resolve-source-trace';
+import { TypeDefinition, resolveTypeDefinition, resolveIntermediateDefinition } from './resolve-type-definition';
+import { emitIntermediateFiles } from './emit-intermediate-file';
 
 export interface TypeshotOptions {
   sourceFileName: string;
@@ -16,6 +17,7 @@ export interface TypeshotOptions {
   basePath?: string;
   project?: string;
   prettierOptions?: prettier.Options;
+  emitIntermediateFiles?: boolean;
 }
 
 export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
@@ -47,7 +49,6 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
   });
 
   const intermediateFiles = createIntermediateFiles(definitions);
-
   const { program, checker, printer } = createTsProgram(basePath, project, sys, (readFile, path, encoding) => {
     return intermediateFiles.get(path) || readFile(path, encoding);
   });
@@ -73,6 +74,15 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
 
   sys.writeFile(outputFileName, safeFormat(result, basePath, options.prettierOptions));
   // TODO: log complete message
+  if (options.emitIntermediateFiles) {
+    emitIntermediateFiles(
+      sys,
+      path.resolve(__dirname, '../.intermediate-files'),
+      outputFileName,
+      basePath,
+      intermediateFiles,
+    );
+  }
 };
 
 const createSourceFileGetter = (sys: ts.System) => {

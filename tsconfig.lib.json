@@ -3,6 +3,6 @@
   "compilerOptions": {
     "rootDir": "src",
   },
-  "exclude": ["node_modules", "**/__tests__/**/*", "**/__fixtures__/**/*"],
+  "exclude": ["node_modules", "**/__tests__/**/*", "**/__fixtures__/**/*", "src/.intermediate-files/**/*"],
   "include": ["src/**/*"],
 }

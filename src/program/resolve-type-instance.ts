@@ -1,5 +1,5 @@
 import { FragmentDependencies, TypeKind, TypeInstance } from '../typeshot';
-import { getSymbolName } from '../utils/symbol';
+import { getSymbolName } from '../utils/converters';
 import type { TypeDefinition } from './resolve-type-definition';
 
 export const resolveTypeInstance = (instance: TypeInstance, definitions: Map<string, TypeDefinition>) => {
