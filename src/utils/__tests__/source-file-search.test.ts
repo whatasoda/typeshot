@@ -1,5 +1,5 @@
 import ts from 'typescript';
-import { getFixtures } from '../../test-utils/getFixtures';
+import { getFixtures } from '../../../test-utils/getFixtures';
 import { getNodeByStack, getSourceFileByStack } from '../source-file-search';
 import { CodeStack } from '../stack-tracking';
 
