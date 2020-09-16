@@ -19,13 +19,21 @@ export const getNodeByStack = <T extends ts.Node = ts.Node>(
   const { filename, line, col } = stack;
   if (filename !== sourceFile.fileName) throw new Error('Invalid Source File: filename unmatched');
 
-  const { statements } = sourceFile;
-  if (statements[0].parent !== sourceFile) throw new Error('Make sure to turn setParentNodes true');
-
   const lines = sourceFile.getLineStarts();
   if (line >= lines.length) throw new Error('Unexpected Line Information: something wrong happened');
 
   const pos = lines[line - 1] + col - 1;
+  return getNodeByPosition(pos, sourceFile, filterPath);
+};
+
+export const getNodeByPosition = <T extends ts.Node = ts.Node>(
+  pos: number,
+  sourceFile: ts.SourceFile,
+  filterPath?: (node: ts.Node) => node is T,
+) => {
+  const { statements } = sourceFile;
+  if (statements[0].parent !== sourceFile) throw new Error('Make sure to turn setParentNodes true');
+
   let layer: readonly ts.Node[] = statements;
   const nodePath: T[] = [];
   while (layer.length) {

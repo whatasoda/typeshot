@@ -4,16 +4,16 @@ import { TypeDefinition } from './resolve-type-definition';
 export const createIntermediateFiles = (allDefinitions: Map<string, TypeDefinition>) => {
   const intermediateTransforms = new Map<ts.SourceFile, TypeDefinition[]>();
   allDefinitions.forEach((definition) => {
-    const { sourceFile, start } = definition;
-    if (!intermediateTransforms.has(sourceFile)) {
-      intermediateTransforms.set(sourceFile, []);
+    const { rawSourceFile, start } = definition;
+    if (!intermediateTransforms.has(rawSourceFile)) {
+      intermediateTransforms.set(rawSourceFile, []);
     }
-    const transforms = intermediateTransforms.get(sourceFile)!;
+    const transforms = intermediateTransforms.get(rawSourceFile)!;
     definition.prepareIntermediateContent();
     transforms[start] = definition;
   });
 
-  const intermediateFiles = new Map<ts.SourceFile, string>();
+  const intermediateFiles = new Map<string, string>();
   intermediateTransforms.forEach((definitions, sourceFile) => {
     const sourceText = sourceFile.getText();
     let acc = '';
@@ -25,7 +25,7 @@ export const createIntermediateFiles = (allDefinitions: Map<string, TypeDefiniti
       cursor = definition.end;
     });
     acc += sourceText.slice(cursor);
-    intermediateFiles.set(sourceFile, acc);
+    intermediateFiles.set(sourceFile.fileName, acc);
   });
 
   return intermediateFiles;

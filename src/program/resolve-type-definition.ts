@@ -1,29 +1,38 @@
 import ts from 'typescript';
 import { TypeDefinitionInfo, TypeInstance } from '../typeshot';
-import { getNodeByStack, getSourceFileByStack } from '../utils/source-file-search';
+import { getNodeByPosition, getNodeByStack, getSourceFileByStack } from '../utils/source-file-search';
 import { CodeStack } from '../utils/stack-tracking';
 import { forEachChildDeep } from './ast-utils';
+
+interface TypeFragmentTemplate {
+  fragmentText: string;
+  templateStrings: TemplateStringsArray;
+  /** item should be a dependency name */
+  substitutions: string[];
+}
 
 export class TypeDefinition {
   public readonly id: string;
   public readonly stack: CodeStack;
   public readonly start: number;
   public readonly end: number;
-  public readonly sourceFile: ts.SourceFile;
+  public readonly rawSourceFile: ts.SourceFile;
   public readonly fragments: Map<string, TypeFragmentTemplate> = new Map();
   public readonly intermediateTypes: Map<TypeInstance, string> = new Map();
   public readonly intermediateContent: string = '() => {}';
   public readonly intermediateFilePosition: { readonly start: number; readonly end: number } | null = null;
+  public readonly types: Map<string, string> = new Map();
 
   constructor(definition: TypeDefinitionInfo, getSourceFile: (filename: string) => ts.SourceFile | null) {
     this.id = definition.id;
     this.stack = definition.stack;
-    this.sourceFile = getSourceFileByStack(definition.stack, getSourceFile);
-    [this.start, this.end] = parseTypeDefinition(definition, this.sourceFile);
-    resolveFragments(this.fragments, definition, this.sourceFile);
+    this.rawSourceFile = getSourceFileByStack(definition.stack, getSourceFile);
+    [this.start, this.end] = parseTypeDefinition(definition, this.rawSourceFile);
+    resolveFragments(this.fragments, definition, this.rawSourceFile);
   }
 
   public prepareIntermediateContent() {
+    if (this.intermediateContent !== '() => {}') throw new Error('TODO');
     let acc: string = '';
     this.intermediateTypes.forEach((typeString, token) => {
       acc += `${token.id}: ${typeString};`;
@@ -33,16 +42,10 @@ export class TypeDefinition {
   }
 
   public setIntermediatePosition(start: number) {
+    if (this.intermediateFilePosition) throw new Error('TODO');
     const end = start + this.intermediateContent.length;
     Object.assign(this, { intermediateFilePosition: { start, end } });
   }
-}
-
-interface TypeFragmentTemplate {
-  fragmentText: string;
-  templateStrings: TemplateStringsArray;
-  /** item should be a dependency name */
-  substitutions: string[];
 }
 
 export const resolveTypeDefinition = (
@@ -110,4 +113,42 @@ const parseFragmentTypeNode = (
   templateStrings.push(sourceText.slice(cursor, fragmentTypeNode.getEnd()));
 
   return { fragmentText, templateStrings, substitutions };
+};
+
+const dummySource = ts.createSourceFile('__dummy__.ts', '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+const defaultBuilderFlags =
+  ts.NodeBuilderFlags.InTypeAlias |
+  ts.NodeBuilderFlags.NoTruncation |
+  ts.NodeBuilderFlags.IgnoreErrors |
+  ts.NodeBuilderFlags.GenerateNamesForShadowedTypeParams |
+  ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope |
+  0;
+export const resolveIntermediateDefinition = (
+  definition: TypeDefinition,
+  program: ts.Program,
+  checker: ts.TypeChecker,
+  printer: ts.Printer,
+  builderFlags: ts.NodeBuilderFlags = defaultBuilderFlags,
+) => {
+  if (!definition.intermediateFilePosition) throw new Error();
+
+  const sourceFile = program.getSourceFile(definition.rawSourceFile.fileName);
+  if (!sourceFile) throw new Error('');
+
+  const pos = definition.intermediateFilePosition.start + /* '() => {type _ = ' */ 16;
+  const { node } = getNodeByPosition(pos, sourceFile);
+  if (!ts.isTypeLiteralNode(node)) throw new Error('');
+
+  node.members.forEach((member) => {
+    if (!ts.isPropertySignature(member) || !ts.isNumericLiteral(member.name) || !member.type) throw new Error('');
+
+    const type = checker.getTypeFromTypeNode(member.type);
+    // TODO: extra optimization by myself
+    const resolvedType = checker.typeToTypeNode(type, undefined, builderFlags);
+    if (!resolvedType) throw new Error('');
+
+    // TODO: format
+    const literal = printer.printNode(ts.EmitHint.Unspecified, resolvedType, dummySource);
+    definition.types.set(member.name.text, literal);
+  });
 };

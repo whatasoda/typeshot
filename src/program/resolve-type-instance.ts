@@ -67,5 +67,6 @@ const resolveInstancePayload = (value: any, definition: TypeDefinition, resolved
   });
 
   // TODO: refactor
-  return fromFragment.length ? `{${fromValue}} & (${fromFragment.join(' & ')})` : `{${fromValue}}`;
+  const rawResult = fromFragment.length ? `{${fromValue}} & (${fromFragment.join(' & ')})` : `{${fromValue}}`;
+  return `typeshot.Expand<${rawResult}>`;
 };

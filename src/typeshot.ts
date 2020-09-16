@@ -3,6 +3,7 @@ import { CodeStack, withStackTracking } from './utils/stack-tracking';
 
 namespace typeshot {
   export type Typeshot = typeof typeshot;
+  export type Expand<T> = { [K in keyof T]: T[K] };
 
   export const union = <T>(members: T[]) => new TypeKind.Union<T>(members);
   export namespace TypeKind {
