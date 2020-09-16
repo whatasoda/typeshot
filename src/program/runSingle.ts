@@ -5,17 +5,23 @@ import { resolveTypeInstance } from './resolve-type-instance';
 import { TypeDefinition, resolveTypeDefinition, resolveIntermediateDefinition } from './resolve-type-definition';
 import { createIntermediateFiles } from './create-intermediate-files';
 import { createTsProgram } from './ts-program';
+import { resolveCustomContent } from './resolve-custom-content';
 
 export interface TypeshotOptions {
   basePath?: string;
   project?: string;
 }
 
-export const runSingle = async (fileName: string, sys: ts.System, options: TypeshotOptions = {}) => {
+export const runSingle = async (targetFileName: string, sys: ts.System, options: TypeshotOptions = {}) => {
   const getSourceFile = createSourceFileGetter(sys);
-  const context = await runWithContext(fileName, {
+  const targetSourceFile = getSourceFile(targetFileName);
+  if (!targetSourceFile) throw new Error(`File Not Found: target file ${targetFileName} is not found`);
+
+  const context = await runWithContext(targetFileName, {
     definitionInfoMap: new Map(),
     template: [],
+    header: null,
+    footer: null,
   });
 
   const definitions = new Map<string, TypeDefinition>();
@@ -39,16 +45,20 @@ export const runSingle = async (fileName: string, sys: ts.System, options: Types
     resolveIntermediateDefinition(definition, program, checker, printer);
   });
 
-  const typeshotContent = context.template.map((content) => {
+  let acc = '';
+  acc += resolveCustomContent(context.header, targetSourceFile);
+  context.template.forEach((content) => {
     if (content instanceof TypeInstanceObject) {
       const type = definitions.get(content.definitionId)?.types.get(content.id);
       if (!type) throw new Error('');
-      return type;
+      acc += type;
+    } else {
+      acc += content;
     }
-    return content;
   });
-  // WIP
-  console.log(typeshotContent);
+  acc += resolveCustomContent(context.footer, targetSourceFile);
+
+  console.log(acc);
 
   return intermediateFiles;
 };

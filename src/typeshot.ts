@@ -1,4 +1,5 @@
 import { getContext } from './context';
+import { reduceTaggedTemplate } from './tagged-template';
 import { CodeStack, withStackTracking } from './utils/stack-tracking';
 
 namespace typeshot {
@@ -90,53 +91,55 @@ namespace typeshot {
   );
 
   /* Printer */
-  export type TemplateSubtitutionsArray = (string | number | boolean | undefined | null | TypeInstance)[];
-  export type ResolvedTemplateArray = (string | TypeInstance)[];
-
-  export const print = (templateArray: TemplateStringsArray, ...substitutions: TemplateSubtitutionsArray): void => {
-    const context = getContext();
-    reduceTaggedTemplate(context.template, templateArray, substitutions);
-  };
-
-  export const template = (
-    templateArray: TemplateStringsArray,
-    ...substitutions: TemplateSubtitutionsArray
-  ): ResolvedTemplateArray => {
-    return reduceTaggedTemplate([], templateArray, substitutions);
-  };
-
-  const reduceTaggedTemplate = (
-    acc: ResolvedTemplateArray,
-    templateArray: TemplateStringsArray,
-    substitutions: TemplateSubtitutionsArray,
-  ): ResolvedTemplateArray => {
-    let pointer = acc.length;
-    acc[pointer] = templateArray[0];
-    for (let i = 0, length = substitutions.length; i < length; i++) {
-      const substitution = substitutions[i];
-      if (substitution instanceof TypeInstanceObject) {
-        acc[++pointer] = substitution;
-        acc[++pointer] = '';
-      } else {
-        acc[pointer] += typeof substitution === 'string' ? substitution : String(substitution);
-      }
-      acc[pointer] += templateArray[i + 1];
+  export type PrinterSubtitution = string | number | boolean | undefined | null | TypeInstance;
+  export type PrinterTemplate = (string | TypeInstance)[];
+  const stringifySubstitution = (substitution: PrinterSubtitution): PrinterTemplate[number] => {
+    if (substitution instanceof TypeInstanceObject) {
+      return substitution;
+    } else {
+      return typeof substitution === 'string' ? substitution : String(substitution);
     }
-    return acc;
   };
 
-  /* Config */
-  export interface Config {
-    output?: string;
-  }
-  export const config = (config: Config): ((...args: Parameters<typeof String.raw>) => void) => {
+  export const print = (templateArray: TemplateStringsArray, ...substitutions: PrinterSubtitution[]): void => {
     const context = getContext();
-
-    context.config = context.config || config;
-    return (...args) => {
-      context.header = context.header || String.raw(...args);
-    };
+    reduceTaggedTemplate(context.template, templateArray, substitutions, stringifySubstitution);
   };
+
+  export const template = (templateArray: TemplateStringsArray, ...substitutions: PrinterSubtitution[]) => {
+    return reduceTaggedTemplate([], templateArray, substitutions, stringifySubstitution);
+  };
+
+  /* Custom Content */
+  export type CustomContentTemplate = (string | (() => string))[];
+  export interface CustomContent {
+    type: 'header' | 'footer';
+    leadingStack: CodeStack;
+    leadingContent: CustomContentTemplate;
+    tailingStack?: CodeStack;
+    tailingContent?: CustomContentTemplate;
+  }
+
+  const createCustomContentFunc = (type: 'header' | 'footer') => {
+    return withStackTracking((stack, template: TemplateStringsArray, ...substitutions: CustomContentTemplate) => {
+      const context = getContext();
+      if (context[type]) throw new Error(`Make sure to define leading contents of ${type} only once`);
+      const content: CustomContent = (context[type] = {
+        type,
+        leadingStack: stack,
+        leadingContent: reduceTaggedTemplate([], template, substitutions, (s) => s),
+      });
+
+      return withStackTracking((stack, template: TemplateStringsArray, ...substitutions: CustomContentTemplate) => {
+        if (content.tailingContent) throw new Error(`Make sure to define tailing contents of ${type} only once`);
+        content.tailingStack = stack;
+        content.tailingContent = reduceTaggedTemplate([], template, substitutions, (s) => s);
+      });
+    });
+  };
+
+  export const header = createCustomContentFunc('header');
+  export const footer = createCustomContentFunc('footer');
 }
 
 export = typeshot;

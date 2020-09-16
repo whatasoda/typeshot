@@ -1,11 +1,11 @@
 import { REGISTER_INSTANCE, register, RegisterOptions } from 'ts-node';
-import type { Config, ResolvedTemplateArray, TypeDefinitionInfo } from './typeshot';
+import type { CustomContent, PrinterTemplate, TypeDefinitionInfo } from './typeshot';
 
 export interface TypeshotContext {
   readonly definitionInfoMap: Map<string, TypeDefinitionInfo>;
-  readonly template: ResolvedTemplateArray;
-  header?: string;
-  config?: Config;
+  readonly template: PrinterTemplate;
+  header: CustomContent | null;
+  footer: CustomContent | null;
   promise?: Promise<void>;
 }
 
