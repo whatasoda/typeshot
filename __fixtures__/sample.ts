@@ -1,15 +1,21 @@
 import typeshot from 'typeshot';
 
+typeshot.openTrace`
+// GENERATED FILE -- DO NOT EDIT
+`;
+
 interface TypeMap {
   text: string;
   number: number;
 }
 
-interface FieldDefinition {
+export interface FieldDefinition {
   id: string;
   type: keyof TypeMap;
   required: boolean;
 }
+
+typeshot.closeTrace();
 
 const PropsType = typeshot.registerTypeDefinition((fields: FieldDefinition[], makeType) => {
   const acc = {};
@@ -36,5 +42,10 @@ const Props = PropsType([
 ]);
 
 typeshot.print`
-  ${Props.interface('hoge')}
+  export type Hoge = ${Props.literal()}
 `;
+
+typeshot.openTrace();
+
+// hogehoge
+typeshot.closeTrace();
