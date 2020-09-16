@@ -1,4 +1,5 @@
 import ts from 'typescript';
+import prettier from 'prettier';
 import path from 'path';
 import { runWithContext } from '../context';
 import { SourceTrace, TypeInstanceObject } from '../typeshot';
@@ -10,19 +11,17 @@ import { resolveSourceTrace, serializeSourceTrace } from './resolve-source-trace
 import { collectImportPathTransform } from './collect-import-path-transform';
 
 export interface TypeshotOptions {
+  sourceFileName: string;
+  outputFileName: string;
   basePath?: string;
   project?: string;
+  prettierOptions?: prettier.Options;
 }
 
-export const runSingle = async (
-  sourceFileName: string,
-  outputFileName: string,
-  sys: ts.System,
-  options: TypeshotOptions = {},
-) => {
+export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
   const { basePath = process.cwd(), project = 'tsconfig.json' } = options;
-  sourceFileName = path.isAbsolute(sourceFileName) ? sourceFileName : path.resolve(basePath, sourceFileName);
-  outputFileName = path.isAbsolute(outputFileName) ? outputFileName : path.resolve(basePath, outputFileName);
+  const sourceFileName = ensureAbsolutePath(options.sourceFileName, basePath);
+  const outputFileName = ensureAbsolutePath(options.outputFileName, basePath);
 
   const getSourceFile = createSourceFileGetter(sys);
   const targetFile = getSourceFile(sourceFileName);
@@ -61,20 +60,19 @@ export const runSingle = async (
   const outputDir = path.parse(outputFileName).dir;
   const transforms = collectImportPathTransform([], targetFile, sourceDir, outputDir);
 
-  let acc = '';
+  let result = '';
   context.template.forEach((content) => {
     if (content instanceof TypeInstanceObject) {
-      acc += definitions.get(content.definitionId)?.types.get(content.id);
+      result += definitions.get(content.definitionId)?.types.get(content.id);
     } else if (content instanceof SourceTrace) {
-      acc += serializeSourceTrace(sourceText, content, transforms);
+      result += serializeSourceTrace(sourceText, content, transforms);
     } else {
-      acc += content;
+      result += content;
     }
   });
 
-  console.log(acc);
-
-  return intermediateFiles;
+  sys.writeFile(outputFileName, safeFormat(result, basePath, options.prettierOptions));
+  // TODO: log complete message
 };
 
 const createSourceFileGetter = (sys: ts.System) => {
@@ -92,4 +90,22 @@ const createSourceFileGetter = (sys: ts.System) => {
     cache.set(fileName, sourceFile);
     return sourceFile;
   };
+};
+
+const ensureAbsolutePath = (raw: string, basePath: string) => {
+  return path.isAbsolute(raw) ? raw : path.resolve(basePath, raw);
+};
+
+const defaultPrettierOptions: prettier.Options = {
+  parser: 'typescript',
+};
+const safeFormat = (raw: string, basePath: string, options: prettier.Options | undefined) => {
+  try {
+    options = options || prettier.resolveConfig.sync(basePath) || defaultPrettierOptions;
+    return prettier.format(raw, options);
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.log(e);
+    return raw;
+  }
 };
