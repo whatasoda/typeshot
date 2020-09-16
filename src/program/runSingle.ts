@@ -4,7 +4,7 @@ import { TypeInstanceObject } from '../typeshot';
 import { resolveTypeInstance } from './resolve-type-instance';
 import { TypeDefinition, resolveTypeDefinition, resolveIntermediateDefinition } from './resolve-type-definition';
 import { createIntermediateFiles } from './create-intermediate-files';
-import { createTsProgram } from './ts-program';
+import { createTsProgram } from '../utils/ts-program';
 import { resolveCustomContent } from './resolve-custom-content';
 
 export interface TypeshotOptions {
