@@ -25,12 +25,11 @@ export const runWithContext = async (
     throw new Error('Invalid Operation: typeshot cannot evaluate multiple files at the same time in the same context');
   }
   try {
-    if (!(REGISTER_INSTANCE in process)) register(registerOptions);
+    if (!(REGISTER_INSTANCE in process)) register({ ...registerOptions, transpileOnly: true });
     CURRENT_TYPESHOT_CONTEXT.current = context;
     require(filename);
     await context.promise;
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.log(e);
   }
   return context;
