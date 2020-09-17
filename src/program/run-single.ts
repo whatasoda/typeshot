@@ -3,6 +3,7 @@ import path from 'path';
 import prettier from 'prettier';
 import { SourceTrace, TypeInstanceObject } from '../typeshot';
 import { runWithContext } from '../context';
+import { formatSafely } from '../utils/format-safely';
 import { createTsProgram } from '../utils/ts-program';
 import { ensureAbsolutePath } from '../utils/converters';
 import { resolveTypeInstance } from './resolve-type-instance';
@@ -11,7 +12,6 @@ import { createIntermediateFiles } from './create-intermediate-files';
 import { collectImportPathTransform } from './collect-import-path-transform';
 import { resolveSourceTrace, serializeSourceTrace } from './resolve-source-trace';
 import { TypeDefinition, resolveTypeDefinition, resolveIntermediateDefinition } from './resolve-type-definition';
-import { formatSafely } from '../utils/format-safely';
 
 export interface TypeshotOptions {
   inputFileName: string;
@@ -22,7 +22,13 @@ export interface TypeshotOptions {
   emitIntermediateFiles?: boolean;
 }
 
+let isCalled = false;
 export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
+  if (isCalled) {
+    throw new Error('Use runSingleInSubprocess or runMultiple to evaluate multiple input files.');
+  } else {
+    isCalled = true;
+  }
   const { basePath = process.cwd(), project = 'tsconfig.json' } = options;
   const inputFileName = ensureAbsolutePath(options.inputFileName, basePath);
   const outputFileName = ensureAbsolutePath(options.outputFileName, basePath);
