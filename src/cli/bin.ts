@@ -127,7 +127,11 @@ export const resolveOutputFileName = (cliOptions: CLIOptions, inputFileName: str
   if ('outFile' in cliOptions) {
     return cliOptions.outFile;
   } else {
-    return path.join(cliOptions.outDir, path.relative(rootDir || basePath || CWD, inputFileName));
+    const localName = path.relative(rootDir || basePath || CWD, inputFileName);
+    if (/^\.\.\//.test(localName)) {
+      throw new Error(`Invalid rootDir: Make sure to place input files under rootDir.`);
+    }
+    return path.join(cliOptions.outDir, localName);
   }
 };
 
