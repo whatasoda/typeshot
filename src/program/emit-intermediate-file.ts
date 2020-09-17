@@ -14,4 +14,6 @@ export const emitIntermediateFiles = (
     const destination = path.join(destinationDir, scopeName, getDirectoryLessPath(filename, basePath));
     sys.writeFile(destination, content);
   });
+
+  return path.join(destinationDir, scopeName);
 };

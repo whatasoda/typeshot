@@ -14,24 +14,25 @@ import { TypeDefinition, resolveTypeDefinition, resolveIntermediateDefinition } 
 import { formatSafely } from '../utils/format-safely';
 
 export interface TypeshotOptions {
-  sourceFileName: string;
+  inputFileName: string;
   outputFileName: string;
   basePath?: string;
   project?: string;
-  prettierOptions?: prettier.Options;
+  prettierOptions?: prettier.Options | string;
   emitIntermediateFiles?: boolean;
 }
 
 export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
   const { basePath = process.cwd(), project = 'tsconfig.json' } = options;
-  const sourceFileName = ensureAbsolutePath(options.sourceFileName, basePath);
+  const inputFileName = ensureAbsolutePath(options.inputFileName, basePath);
   const outputFileName = ensureAbsolutePath(options.outputFileName, basePath);
+  console.log(`Processing '${inputFileName}'...`);
 
   const getSourceFile = createSourceFileGetter(sys);
-  const targetFile = getSourceFile(sourceFileName);
-  if (!targetFile) throw new Error(`File Not Found: target file ${sourceFileName} is not found`);
+  const inputFile = getSourceFile(inputFileName);
+  if (!inputFile) throw new Error(`File Not Found: input file ${inputFileName} is not found`);
 
-  const context = await runWithContext(sourceFileName, {
+  const context = await runWithContext(inputFileName, {
     definitionInfoMap: new Map(),
     template: [],
     pendingTrace: null,
@@ -46,7 +47,7 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
     if (content instanceof TypeInstanceObject) {
       resolveTypeInstance(content, definitions);
     } else if (content instanceof SourceTrace) {
-      resolveSourceTrace(targetFile, content);
+      resolveSourceTrace(inputFile, content);
     }
   });
 
@@ -58,10 +59,13 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
     resolveIntermediateDefinition(definition, program, checker, printer);
   });
 
-  const sourceText = targetFile.getFullText();
-  const sourceDir = path.parse(sourceFileName).dir;
-  const outputDir = path.parse(outputFileName).dir;
-  const transforms = collectImportPathTransform([], targetFile, sourceDir, outputDir);
+  const sourceText = inputFile.getFullText();
+  const transforms = collectImportPathTransform(
+    [],
+    inputFile,
+    path.dirname(inputFileName),
+    path.dirname(outputFileName),
+  );
 
   let result = '';
   context.template.forEach((content) => {
@@ -75,15 +79,19 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
   });
 
   sys.writeFile(outputFileName, formatSafely(result, basePath, options.prettierOptions));
-  // TODO: log complete message
   if (options.emitIntermediateFiles) {
-    emitIntermediateFiles(
+    const intermediateFileDir = emitIntermediateFiles(
       sys,
       path.resolve(__dirname, '../.intermediate-files'),
       outputFileName,
       basePath,
       intermediateFiles,
     );
+    console.log(
+      `Finished '${inputFileName}', result emitted to '${outputFileName}', intermediate files stored in '${intermediateFileDir}'`,
+    );
+  } else {
+    console.log(`Finished '${inputFileName}', result emitted to '${outputFileName}'`);
   }
 };
 

@@ -5,7 +5,7 @@ import { runSingle, TypeshotOptions } from './run-single';
 const runtime = /\.tsx?$/.test(__filename) ? 'ts-node-transpile-only' : 'node';
 
 export const runSingleInSubprocess = (options: TypeshotOptions, systemModulePath: string = 'typescript') => {
-  return new Promise((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     const cp = exec(`${runtime} ${__filename} '${JSON.stringify(options)}' ${systemModulePath}`);
     cp.stdout?.pipe(process.stdout);
     cp.stderr?.pipe(process.stderr);
@@ -29,8 +29,8 @@ if (require.main === module) {
     try {
       await runSingle(sys, options);
     } catch (e) {
-      // eslint-disable-next-line no-console
       console.log(e);
+      process.exit(1);
     }
   };
 
