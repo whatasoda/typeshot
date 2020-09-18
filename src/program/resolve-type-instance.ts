@@ -10,14 +10,22 @@ export const resolveTypeInstance = (instance: TypeInstance, definitions: Map<str
   if (!definition) {
     throw new Error(`Unknown Type Definition: type definition '${definitionId}' is not found`);
   }
-  definition.intermediateTypes.set(instance, resolveInstancePayload(value, definition));
+  definition.imdTypes.set(instance, createMediationTypeText(value, definition));
 };
 
-const resolveInstancePayload = (
+export interface IntermediateTypeAccumulator {
+  solubleSigs: string[];
+  solubleTypes: string[];
+  insolubleSigs: string[];
+  insolubleTypes: string[];
+  nestedInsolubleSigs: string[];
+}
+
+const createMediationTypeText = (
   value: any,
   definition: TypeDefinition,
   resolved: Set<any> = new Set(),
-  onIntegration?: () => void,
+  onNestedSolutionFound?: () => void,
 ): string => {
   switch (value) {
     case null:
@@ -26,7 +34,7 @@ const resolveInstancePayload = (
       return 'undefined';
   }
 
-  const { id: definitionId, fragments } = definition;
+  const { id: definitionId, fragmentTempaltes } = definition;
   switch (typeof value) {
     case 'boolean':
     case 'string':
@@ -44,84 +52,82 @@ const resolveInstancePayload = (
   resolved.add(value);
 
   if (value instanceof TypeKind.Union) {
-    return value.members.map((member) => `(${resolveInstancePayload(member, definition, resolved)})`).join(' | ');
+    return value.members.map((member) => `(${createMediationTypeText(member, definition, resolved)})`).join(' | ');
   }
 
   if (Array.isArray(value)) {
-    return `[${value.map((value) => resolveInstancePayload(value, definition, resolved)).join(', ')}]`;
+    return `[${value.map((value) => createMediationTypeText(value, definition, resolved)).join(', ')}]`;
   }
 
-  const crossableTypes: string[] = [];
-  const exceptionalTypes: string[] = [];
-  const crossableSignatures: string[] = [];
-  const exceptionalSignatures: string[] = [];
-  const childSpectialSignatures: string[] = [];
+  const acc: IntermediateTypeAccumulator = {
+    solubleSigs: [],
+    solubleTypes: [],
+    insolubleSigs: [],
+    insolubleTypes: [],
+    nestedInsolubleSigs: [],
+  };
 
   Object.getOwnPropertyNames(value).forEach((key) => {
-    let hasIntegration = false;
-    const type = resolveInstancePayload(value[key], definition, resolved, () => void (hasIntegration = true));
+    let hasNestedSoluble = false;
+    const type = createMediationTypeText(value[key], definition, resolved, () => void (hasNestedSoluble = true));
     const signature = `${key}: ${type};`;
-    if (hasIntegration) {
-      onIntegration?.();
-      childSpectialSignatures.push(signature);
+    if (hasNestedSoluble) {
+      acc.nestedInsolubleSigs.push(signature);
     } else {
-      crossableSignatures.push(signature);
+      acc.solubleSigs.push(signature);
     }
   });
 
   Object.getOwnPropertySymbols(value).forEach((sym) => {
     const fragmentId = getSymbolName(sym);
-    const fragment = fragments.get(fragmentId);
-    if (!fragment) {
-      throw new Error(`Fragment Not Found: check around '${fragmentId}'`);
-    }
+    const template = fragmentTempaltes.get(fragmentId);
+    if (!template) throw new Error(`Fragment Not Found: check around '${fragmentId}'`);
 
-    const dependencies: FragmentDependencies = value[sym] || {};
-    if (fragment.crossableSignatures) {
-      crossableSignatures.push(fragment.crossableSignatures.serialize(dependencies));
-    }
-    if (fragment.exceptionalSignatures) {
-      exceptionalSignatures.push(fragment.exceptionalSignatures.serialize(dependencies));
-    }
-    if (fragment.crossableTypes) {
-      crossableTypes.push(fragment.crossableTypes.serialize(dependencies));
-    }
-    if (fragment.exceptionalTypes) {
-      exceptionalTypes.push(fragment.exceptionalTypes.serialize(dependencies));
-    }
+    const rawDependencies: FragmentDependencies = value[sym] || {};
+    const dependencies = new Map<string, string>();
+    Object.entries(rawDependencies).forEach(([key, value]) => {
+      dependencies.set(key, JSON.stringify(value));
+    });
+
+    const { solubleSigs, insolubleSigs, solubleTypes, insolubleTypes } = template;
+    if (solubleSigs) acc.solubleSigs.push(solubleSigs.serialize(dependencies));
+    if (solubleTypes) acc.solubleTypes.push(solubleTypes.serialize(dependencies));
+    if (insolubleSigs) acc.insolubleSigs.push(insolubleSigs.serialize(dependencies));
+    if (insolubleTypes) acc.insolubleTypes.push(insolubleTypes.serialize(dependencies));
   });
 
-  if (crossableSignatures.length) crossableTypes.push(`{${crossableSignatures.join('')}}`);
-  if (exceptionalSignatures.length) exceptionalTypes.push(`{${exceptionalSignatures.join('')}}`);
+  return finalizeIntermediateType(acc, onNestedSolutionFound);
+};
+
+export const finalizeIntermediateType = (
+  { solubleSigs, solubleTypes, insolubleSigs, insolubleTypes, nestedInsolubleSigs }: IntermediateTypeAccumulator,
+  onNestedSolutionFound: (() => void) | undefined,
+) => {
+  if (solubleSigs.length) solubleTypes.push(`{${solubleSigs.join('')}}`);
+  if (insolubleSigs.length) insolubleTypes.push(`{${insolubleSigs.join('')}}`);
 
   const result = [];
-  if (crossableTypes.length) {
-    onIntegration?.();
-    result.push(`typeshot.Integrate<${crossableTypes.join(' & ')}>`);
+  if (insolubleTypes.length) {
+    result.push(`(/* typeshot.Eval */(${insolubleTypes.join(' & ')}))`);
   }
-  if (exceptionalTypes.length) {
-    result.push(`(/* typeshot.Eval */(${exceptionalTypes.join(' & ')}))`);
+  if (solubleTypes.length) {
+    onNestedSolutionFound?.();
+    result.push(`typeshot.Integrate<${solubleTypes.join(' & ')}>`);
   }
-  if (childSpectialSignatures.length) {
-    result.push(`{${childSpectialSignatures.join('')}}`);
+  if (nestedInsolubleSigs.length) {
+    onNestedSolutionFound?.();
+    result.push(`{${nestedInsolubleSigs.join('')}}`);
   }
 
   return result.join(' & ');
 };
 
-const defaultBuilderFlags =
-  ts.NodeBuilderFlags.InTypeAlias |
-  ts.NodeBuilderFlags.NoTruncation |
-  ts.NodeBuilderFlags.IgnoreErrors |
-  ts.NodeBuilderFlags.GenerateNamesForShadowedTypeParams |
-  ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope |
-  0;
-export const resolveIntermediateTypeInstance = (
+export const evaluateMediationTypeNode = (
   member: ts.TypeElement,
   sourceText: string,
   checker: ts.TypeChecker,
   printer: ts.Printer,
-  builderFlags: ts.NodeBuilderFlags = defaultBuilderFlags,
+  builderFlags?: ts.NodeBuilderFlags,
 ) => {
   if (ts.isPropertySignature(member) && ts.isNumericLiteral(member.name) && member.type) {
     const { type, name } = member;
@@ -147,10 +153,9 @@ const isIntegrateType = (node: ts.Node) => {
   return ts.isTypeReferenceNode(node) && node.typeName.getText() === 'typeshot.Integrate';
 };
 
-const dummyFile = ts.createSourceFile('__dummy__.ts', '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
 export class IntermediateTypeAstTemplate extends AstTemplate<
   ts.TypeNode,
-  [checker: ts.TypeChecker, printer: ts.Printer, builderFlags: ts.NodeBuilderFlags]
+  [checker: ts.TypeChecker, printer: ts.Printer, builderFlags?: ts.NodeBuilderFlags]
 > {
   protected getSubstitution(node: ts.Node) {
     if (ts.isTypeReferenceNode(node) && node.typeName.getText() === 'typeshot.Integrate') {
@@ -169,7 +174,7 @@ export class IntermediateTypeAstTemplate extends AstTemplate<
     node: ts.TypeNode,
     checker: ts.TypeChecker,
     printer: ts.Printer,
-    builderFlags: ts.NodeBuilderFlags,
+    builderFlags: ts.NodeBuilderFlags = defaultBuilderFlags,
   ) {
     const type = checker.getTypeFromTypeNode(node);
     const resolvedType = checker.typeToTypeNode(type, undefined, builderFlags);
@@ -177,3 +182,11 @@ export class IntermediateTypeAstTemplate extends AstTemplate<
     return printer.printNode(ts.EmitHint.Unspecified, resolvedType, dummyFile);
   }
 }
+const dummyFile = ts.createSourceFile('__dummy__.ts', '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+const defaultBuilderFlags =
+  ts.NodeBuilderFlags.InTypeAlias |
+  ts.NodeBuilderFlags.NoTruncation |
+  ts.NodeBuilderFlags.IgnoreErrors |
+  ts.NodeBuilderFlags.GenerateNamesForShadowedTypeParams |
+  ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope |
+  0;

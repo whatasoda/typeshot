@@ -1,32 +1,28 @@
 import ts from 'typescript';
 import { TypeDefinition } from './resolve-type-definition';
 
-export const createIntermediateFiles = (allDefinitions: Map<string, TypeDefinition>) => {
-  const intermediateTransforms = new Map<ts.SourceFile, TypeDefinition[]>();
-  allDefinitions.forEach((definition) => {
-    const { rawSourceFile, start } = definition;
-    if (!intermediateTransforms.has(rawSourceFile)) {
-      intermediateTransforms.set(rawSourceFile, []);
+export const createIntermediateFiles = (definitions: Map<string, TypeDefinition>) => {
+  const transforms = new Map<ts.SourceFile, TypeDefinition[]>();
+  definitions.forEach(({ definition, start, sourceFile }) => {
+    if (!transforms.has(sourceFile)) {
+      transforms.set(sourceFile, []);
     }
-    const transforms = intermediateTransforms.get(rawSourceFile)!;
-    definition.prepareIntermediateContent();
-    transforms[start] = definition;
+    transforms.get(sourceFile)![start] = definition;
   });
 
-  const intermediateFiles = new Map<string, string>();
-  intermediateTransforms.forEach((definitions, sourceFile) => {
+  const mediationFiles = new Map<string, string>();
+  transforms.forEach((definitions, sourceFile) => {
     const sourceText = sourceFile.getText();
     let acc = '';
     let cursor = 0;
     definitions.forEach((definition) => {
       acc += sourceText.slice(cursor, definition.start);
-      definition.setIntermediatePosition(acc.length);
-      acc += definition.intermediateContent;
+      acc += definition.createMediationTypeText(acc.length);
       cursor = definition.end;
     });
     acc += sourceText.slice(cursor);
-    intermediateFiles.set(sourceFile.fileName, acc);
+    mediationFiles.set(sourceFile.fileName, acc);
   });
 
-  return intermediateFiles;
+  return mediationFiles;
 };

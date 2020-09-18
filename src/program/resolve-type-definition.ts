@@ -2,43 +2,43 @@ import ts from 'typescript';
 import { TypeDefinitionInfo, TypeInstance } from '../typeshot';
 import { CodeStack } from '../utils/stack-tracking';
 import { getNodeByPosition, getNodeByStack, getSourceFileByStack } from '../utils/ast';
-import { ComposedTemplate, parseFragment } from './parse-fragment-type-node';
-import { resolveIntermediateTypeInstance } from './resolve-type-instance';
+import { FragmentTemplate, createFragmentTemplate } from './parse-fragment-type-node';
+import { evaluateMediationTypeNode } from './resolve-type-instance';
 
 export class TypeDefinition {
+  public readonly definition: this;
   public readonly id: string;
   public readonly stack: CodeStack;
   public readonly start: number;
   public readonly end: number;
-  public readonly rawSourceFile: ts.SourceFile;
-  public readonly fragments: Map<string, ComposedTemplate> = new Map();
-  public readonly intermediateTypes: Map<TypeInstance, string> = new Map();
-  public readonly intermediateContent: string = '() => {}';
-  public readonly intermediateFilePosition: { readonly start: number; readonly end: number } | null = null;
+  public readonly sourceFile: ts.SourceFile;
+  public readonly sourceText: string;
+  public readonly fragmentTempaltes: Map<string, FragmentTemplate> = new Map();
+  public readonly imdTypes: Map<TypeInstance, string> = new Map();
   public readonly types: Map<string, (instance: TypeInstance) => string> = new Map();
+  public imdStart: number = 0;
 
   constructor(definition: TypeDefinitionInfo, getSourceFile: (filename: string) => ts.SourceFile | null) {
+    this.definition = this;
     this.id = definition.id;
     this.stack = definition.stack;
-    this.rawSourceFile = getSourceFileByStack(definition.stack, getSourceFile);
-    [this.start, this.end] = parseTypeDefinition(definition, this.rawSourceFile);
-    resolveFragments(this.fragments, definition, this.rawSourceFile);
+    this.sourceFile = getSourceFileByStack(definition.stack, getSourceFile);
+    [this.start, this.end] = varidateTypeDefinition(definition, this.sourceFile);
+    this.sourceText = this.sourceFile.getFullText();
+    definition.fragments.forEach((stack, id) => {
+      this.fragmentTempaltes.set(id, createFragmentTemplate(id, stack, this.sourceFile, this.sourceText));
+    });
   }
 
-  public prepareIntermediateContent() {
-    if (this.intermediateContent !== '() => {}') throw new Error('TODO');
+  public createMediationTypeText(currentContentLength: number): string {
     let acc: string = '';
-    this.intermediateTypes.forEach((typeString, token) => {
+    this.imdTypes.forEach((typeString, token) => {
       acc += `${token.id}: ${typeString};`;
     });
-    const intermediateContent = `() => {type _ = {${acc}};}`;
-    Object.assign(this, { intermediateContent });
-  }
+    const typeText = `() => {type _ = {${acc}};}`;
+    this.imdStart = currentContentLength + 16 /* '() => {type _ = ' */;
 
-  public setIntermediatePosition(start: number) {
-    if (this.intermediateFilePosition) throw new Error('TODO');
-    const end = start + this.intermediateContent.length;
-    Object.assign(this, { intermediateFilePosition: { start, end } });
+    return typeText;
   }
 }
 
@@ -49,7 +49,7 @@ export const resolveTypeDefinition = (
   return new TypeDefinition(definition, getSourceFile);
 };
 
-const parseTypeDefinition = ({ id, stack }: TypeDefinitionInfo, sourceFile: ts.SourceFile) => {
+const varidateTypeDefinition = ({ id, stack }: TypeDefinitionInfo, sourceFile: ts.SourceFile) => {
   const { nodePath } = getNodeByStack(stack, sourceFile, ts.isCallExpression);
   const nearestCallExpression = nodePath[nodePath.length - 1];
   const argumentLength = nearestCallExpression.arguments.length;
@@ -69,44 +69,22 @@ const parseTypeDefinition = ({ id, stack }: TypeDefinitionInfo, sourceFile: ts.S
   return [factory.getStart(), factory.getEnd()] as const;
 };
 
-const resolveFragments = (
-  acc: Map<string, ComposedTemplate>,
-  { fragments }: TypeDefinitionInfo,
-  sourceFile: ts.SourceFile,
-) => {
-  const sourceText = sourceFile.getFullText();
-  fragments.forEach((stack, id) => {
-    const { nodePath } = getNodeByStack(stack, sourceFile, ts.isCallExpression);
-    const nearestCallExpression = nodePath[nodePath.length - 1];
-    if (!nearestCallExpression.typeArguments || nearestCallExpression.typeArguments.length !== 1) {
-      const length = nearestCallExpression.typeArguments?.length || 0;
-      throw new RangeError(
-        `Invalid Type Argument Range: 'createTypeFragment' requires 1 type argument, but received ${length} at '${id}'`,
-      );
-    }
-    acc.set(id, parseFragment(nearestCallExpression.typeArguments[0], sourceText));
-  });
-};
-
-export const resolveIntermediateDefinition = (
-  definition: TypeDefinition,
+export const resolveImdDefinition = (
+  { sourceFile, imdStart: mediationStart, types }: TypeDefinition,
   program: ts.Program,
   checker: ts.TypeChecker,
   printer: ts.Printer,
   builderFlags?: ts.NodeBuilderFlags,
 ) => {
-  if (!definition.intermediateFilePosition) throw new Error();
+  const imdFile = program.getSourceFile(sourceFile.fileName);
+  if (!imdFile) throw new Error('');
 
-  const sourceFile = program.getSourceFile(definition.rawSourceFile.fileName);
-  if (!sourceFile) throw new Error('');
-
-  const pos = definition.intermediateFilePosition.start + /* '() => {type _ = ' */ 16;
-  const { node } = getNodeByPosition(pos, sourceFile);
+  const { node } = getNodeByPosition(mediationStart, imdFile);
   if (!ts.isTypeLiteralNode(node)) throw new Error('');
 
-  const sourceText = sourceFile.getFullText();
+  const sourceText = imdFile.getFullText();
   node.members.forEach((member) => {
-    const { id, typeFunc } = resolveIntermediateTypeInstance(member, sourceText, checker, printer, builderFlags);
-    definition.types.set(id, typeFunc);
+    const { id, typeFunc } = evaluateMediationTypeNode(member, sourceText, checker, printer, builderFlags);
+    types.set(id, typeFunc);
   });
 };

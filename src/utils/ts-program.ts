@@ -41,3 +41,20 @@ const readConfigFile = (basePath: string, project: string, sys: ts.System, forma
 
   return tsconfig;
 };
+
+export const createSourceFileGetter = (sys: ts.System) => {
+  const cache = new Map<string, ts.SourceFile | null>();
+  return (fileName: string) => {
+    if (cache.has(fileName)) {
+      return cache.get(fileName) || null;
+    }
+    const sourceText = sys.readFile(fileName, 'utf-8');
+    if (!sourceText) {
+      cache.set(fileName, null);
+      return null;
+    }
+    const sourceFile = ts.createSourceFile(fileName, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.Unknown);
+    cache.set(fileName, sourceFile);
+    return sourceFile;
+  };
+};

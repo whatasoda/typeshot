@@ -4,14 +4,14 @@ import prettier from 'prettier';
 import { SourceTrace, TypeInstanceObject } from '../typeshot';
 import { runWithContext } from '../context';
 import { formatSafely } from '../utils/format-safely';
-import { createTsProgram } from '../utils/ts-program';
+import { createSourceFileGetter, createTsProgram } from '../utils/ts-program';
 import { ensureAbsolutePath } from '../utils/converters';
 import { resolveTypeInstance } from './resolve-type-instance';
-import { emitIntermediateFiles } from './emit-intermediate-file';
+import { emitImdFiles } from './emit-intermediate-file';
 import { createIntermediateFiles } from './create-intermediate-files';
 import { collectImportPathTransform } from './collect-import-path-transform';
 import { resolveSourceTrace, serializeSourceTrace } from './resolve-source-trace';
-import { TypeDefinition, resolveTypeDefinition, resolveIntermediateDefinition } from './resolve-type-definition';
+import { TypeDefinition, resolveTypeDefinition, resolveImdDefinition } from './resolve-type-definition';
 
 export interface TypeshotOptions {
   inputFileName: string;
@@ -57,12 +57,12 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
     }
   });
 
-  const intermediateFiles = createIntermediateFiles(definitions);
+  const imdFiles = createIntermediateFiles(definitions);
   const { program, checker, printer } = createTsProgram(basePath, project, sys, (readFile, path, encoding) => {
-    return intermediateFiles.get(path) || readFile(path, encoding);
+    return imdFiles.get(path) || readFile(path, encoding);
   });
   definitions.forEach((definition) => {
-    resolveIntermediateDefinition(definition, program, checker, printer);
+    resolveImdDefinition(definition, program, checker, printer);
   });
 
   const sourceText = inputFile.getFullText();
@@ -76,8 +76,7 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
   let result = '';
   context.template.forEach((content) => {
     if (content instanceof TypeInstanceObject) {
-      const typeText = definitions.get(content.definitionId)?.types.get(content.id)?.(content);
-      result += typeText;
+      result += definitions.get(content.definitionId)!.types.get(content.id)!(content);
     } else if (content instanceof SourceTrace) {
       result += serializeSourceTrace(sourceText, content, transforms);
     } else {
@@ -87,34 +86,17 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
 
   sys.writeFile(outputFileName, formatSafely(result, basePath, options.prettierOptions));
   if (options.emitIntermediateFiles) {
-    const intermediateFileDir = emitIntermediateFiles(
+    const imdFileDir = emitImdFiles(
       sys,
       path.resolve(__dirname, '../.intermediate-files'),
       outputFileName,
       basePath,
-      intermediateFiles,
+      imdFiles,
     );
     console.log(
-      `Finished '${inputFileName}', result emitted to '${outputFileName}', intermediate files stored in '${intermediateFileDir}'`,
+      `Finished '${inputFileName}', result emitted to '${outputFileName}', intermediate files stored in '${imdFileDir}'`,
     );
   } else {
     console.log(`Finished '${inputFileName}', result emitted to '${outputFileName}'`);
   }
-};
-
-const createSourceFileGetter = (sys: ts.System) => {
-  const cache = new Map<string, ts.SourceFile | null>();
-  return (fileName: string) => {
-    if (cache.has(fileName)) {
-      return cache.get(fileName) || null;
-    }
-    const sourceText = sys.readFile(fileName, 'utf-8');
-    if (!sourceText) {
-      cache.set(fileName, null);
-      return null;
-    }
-    const sourceFile = ts.createSourceFile(fileName, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.Unknown);
-    cache.set(fileName, sourceFile);
-    return sourceFile;
-  };
 };

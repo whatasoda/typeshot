@@ -1,75 +1,92 @@
 import ts from 'typescript';
-import { FragmentDependencies } from '../typeshot';
+import { getNodeByStack } from '../utils/ast';
 import { AstTemplate } from '../utils/ast-template';
+import { CodeStack } from '../utils/stack-tracking';
 
 interface TemplateSector {
   types: FragmentAstTemplate[];
-  signatures: FragmentAstTemplate[];
+  sigs: FragmentAstTemplate[];
 }
 
-interface ParsedTemplates {
-  crossable: TemplateSector;
-  exceptional: TemplateSector;
+interface TemporaryTemplates {
+  soluble: TemplateSector;
+  insoluble: TemplateSector;
 }
 
-export interface ComposedTemplate {
-  crossableTypes: FragmentAstTemplate | null;
-  crossableSignatures: FragmentAstTemplate | null;
-  exceptionalTypes: FragmentAstTemplate | null;
-  exceptionalSignatures: FragmentAstTemplate | null;
+export interface FragmentTemplate {
+  solubleSigs: FragmentAstTemplate | null;
+  solubleTypes: FragmentAstTemplate | null;
+  insolubleSigs: FragmentAstTemplate | null;
+  insolubleTypes: FragmentAstTemplate | null;
 }
 
-export class FragmentAstTemplate extends AstTemplate<string, [dependencies: FragmentDependencies]> {
+export class FragmentAstTemplate extends AstTemplate<string, [dependencies: Map<string, string>]> {
   protected getSubstitution(node: ts.Node) {
     return ts.isTypeQueryNode(node) ? node.exprName.getText() : null;
   }
-  protected serializeSubstitution(dependencyName: string, dependencies: FragmentDependencies) {
-    if (dependencyName in dependencies) {
-      return JSON.stringify(dependencies[dependencyName]);
+  protected serializeSubstitution(dependencyName: string, dependencies: Map<string, string>) {
+    if (dependencies.has(dependencyName)) {
+      return dependencies.get(dependencyName)!;
     } else {
       throw new Error(`Dependency Not Found: dependency ${dependencyName} is missed.`);
     }
   }
 }
 
-export const parseFragment = (node: ts.TypeNode, sourceText: string): ComposedTemplate => {
-  const { crossable: C, exceptional: E } = parseTypeNode(undefined, node, sourceText);
-  const crossableTypes = C.types.length ? new FragmentAstTemplate(null).append(C.types, ' & ') : null;
-  const exceptionalTypes = E.types.length ? new FragmentAstTemplate(null).append(E.types, ' & ') : null;
-  const crossableSignatures = C.signatures.length ? new FragmentAstTemplate(null).append(C.signatures) : null;
-  const exceptionalSignatures = E.signatures.length ? new FragmentAstTemplate(null).append(E.signatures) : null;
-  return { crossableTypes, crossableSignatures, exceptionalTypes, exceptionalSignatures };
+export const createFragmentTemplate = (
+  fragmentId: string,
+  stack: CodeStack,
+  sourceFile: ts.SourceFile,
+  sourceText: string,
+): FragmentTemplate => {
+  const { nodePath } = getNodeByStack(stack, sourceFile, ts.isCallExpression);
+  const nearestCallExpression = nodePath[nodePath.length - 1];
+  if (!nearestCallExpression.typeArguments || nearestCallExpression.typeArguments.length !== 1) {
+    const length = nearestCallExpression.typeArguments?.length || 0;
+    throw new RangeError(
+      `Invalid Type Argument Range: 'createTypeFragment' requires 1 type argument, but received ${length} at '${fragmentId}'`,
+    );
+  }
+
+  const node = nearestCallExpression.typeArguments[0];
+  const { soluble: S, insoluble: I } = parseFragmentTypeNode(undefined, node, sourceText);
+  return {
+    solubleSigs: S.sigs.length ? new FragmentAstTemplate(null).append(S.sigs) : null,
+    solubleTypes: S.types.length ? new FragmentAstTemplate(null).append(S.types, ' & ') : null,
+    insolubleSigs: I.sigs.length ? new FragmentAstTemplate(null).append(I.sigs) : null,
+    insolubleTypes: I.types.length ? new FragmentAstTemplate(null).append(I.types, ' & ') : null,
+  };
 };
 
-export const parseTypeNode = (
-  acc: ParsedTemplates = { crossable: { types: [], signatures: [] }, exceptional: { types: [], signatures: [] } },
+export const parseFragmentTypeNode = (
+  acc: TemporaryTemplates = { soluble: { types: [], sigs: [] }, insoluble: { types: [], sigs: [] } },
   node: ts.TypeNode,
   sourceText: string,
 ) => {
-  const { crossable, exceptional } = acc;
+  const { soluble, insoluble } = acc;
   while (ts.isParenthesizedTypeNode(node)) node = node.type;
 
   if (ts.isIntersectionTypeNode(node)) {
     node.types.forEach((member) => {
-      parseTypeNode(acc, member, sourceText);
+      parseFragmentTypeNode(acc, member, sourceText);
     });
   } else if (ts.isTypeLiteralNode(node)) {
     node.members.forEach((member) => {
       const template = new FragmentAstTemplate(member, sourceText).ensureEnd(';');
       if (ts.isMethodSignature(member) || ts.isPropertySignature(member) || ts.isIndexSignatureDeclaration(member)) {
-        crossable.signatures.push(template);
+        soluble.sigs.push(template);
       } else if (ts.isCallSignatureDeclaration(member) || ts.isConstructSignatureDeclaration(member)) {
-        exceptional.signatures.push(template);
+        insoluble.sigs.push(template);
       }
     });
   } else {
     const template = new FragmentAstTemplate(node, sourceText);
     if (ts.isMappedTypeNode(node)) {
-      crossable.types.push(template);
+      soluble.types.push(template);
     } else if (ts.isUnionTypeNode(node) || ts.isConditionalTypeNode(node)) {
-      exceptional.types.push(template.wrap('(', ')'));
+      insoluble.types.push(template.wrap('(', ')'));
     } else {
-      exceptional.types.push(template);
+      insoluble.types.push(template);
     }
   }
   return acc;
