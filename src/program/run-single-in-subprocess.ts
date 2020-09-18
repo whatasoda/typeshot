@@ -1,33 +1,43 @@
 import type ts from 'typescript';
-import { exec } from 'child_process';
+import { fork, SendHandle, Serializable } from 'child_process';
 import { runSingle, TypeshotOptions } from './run-single';
+import { ensureAbsolutePath } from '../utils/converters';
 
-const runtime = /\.tsx?$/.test(__filename) ? 'ts-node-transpile-only' : 'node';
+const execArgv = /\.tsx?$/.test(__filename) ? ['-r', 'ts-node/register/transpile-only'] : [];
 
-export const runSingleInSubprocess = (options: TypeshotOptions, systemModulePath: string = 'typescript') => {
+export const runSingleInSubprocess = (
+  options: TypeshotOptions,
+  systemModulePath: string = 'typescript',
+  onMessage?: (message: Serializable, sendHandle: SendHandle) => void,
+) => {
   return new Promise<void>((resolve, reject) => {
-    const cp = exec(`${runtime} ${__filename} '${JSON.stringify(options)}' ${systemModulePath}`);
+    const cp = fork(__filename, { execArgv });
+    cp.send([options, ensureAbsolutePath(systemModulePath, options.basePath || process.cwd())]);
     cp.stdout?.pipe(process.stdout);
     cp.stderr?.pipe(process.stderr);
     cp.on('close', (code) => (code === 0 ? resolve() : reject()));
+    if (onMessage) {
+      cp.on('message', onMessage);
+    }
   });
 };
 
 if (require.main === module) {
-  const getSystem = (systemModulePath: string) => {
-    const systemModule = require(systemModulePath);
-    if (!systemModule || !('sys' in systemModule)) {
-      throw new Error('');
-    }
-    return systemModule.sys as ts.System;
-  };
+  if (!process.connected) {
+    console.log('Make sure to run this module via runSingleInSubprocess');
+    process.exit(1);
+  }
+
+  const args = new Promise<Parameters<typeof runSingle>>((resolve) => {
+    process.once('message', ([options, systemModulePath]) => {
+      const { sys } = require(systemModulePath) as Pick<typeof ts, 'sys'>;
+      return resolve([sys, options]);
+    });
+  });
 
   const main = async () => {
-    const [, , optionsJson, systemSourcePath] = process.argv;
-    const options = JSON.parse(optionsJson) as TypeshotOptions;
-    const sys = getSystem(systemSourcePath);
     try {
-      await runSingle(sys, options);
+      await runSingle(...(await args));
     } catch (e) {
       console.log(e);
       process.exit(1);

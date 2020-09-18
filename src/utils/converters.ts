@@ -12,5 +12,5 @@ export const getDirectoryLessPath = (p: string, basePath: string) => {
 };
 
 export const ensureAbsolutePath = (p: string, basePath: string) => {
-  return path.isAbsolute(p) ? p : path.resolve(basePath, p);
+  return p.startsWith(path.sep) ? p : /^\.+\//.test(p) ? path.resolve(basePath, p) : p;
 };
