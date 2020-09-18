@@ -59,11 +59,14 @@ export const getNodeByPosition = <T extends ts.Node = ts.Node>(
   throw new Error('Node Not Found: something wrong happened');
 };
 
-export const forEachChildDeep = (root: ts.Node, callback: (node: ts.Node) => void) => {
-  const queue: ts.Node[] = [root];
-  while (queue.length) {
-    const node = queue.shift()!;
-    callback(node);
-    node.forEachChild((child) => void queue.push(child));
+export const forEachChildDeep = (root: ts.Node, callback: (node: ts.Node) => true | void) => {
+  const stack: ts.Node[] = [root];
+  while (stack.length) {
+    const node = stack.shift()!;
+    if (callback(node)) {
+      continue; // skip children
+    } else {
+      stack.unshift(...node.getChildren());
+    }
   }
 };
