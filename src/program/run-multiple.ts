@@ -11,24 +11,15 @@ export const runMultiple = async (
   systemModulePath: string = 'typescript',
 ): Promise<void> => {
   console.log('Processing files parallelly...');
-  const queue = entries.values();
-  const result = await evaluatePrallelly(maxParallel, async (onLastItem) => {
-    const item = queue.next();
-    if (item.done) {
-      onLastItem();
-    } else {
-      const [inputFileName, outputFileName] = item.value;
-      await runSingleInSubprocess({ ...common, inputFileName, outputFileName }, systemModulePath);
-    }
-    return true;
+  let succeeded = 0;
+  let failed = 0;
+  const promise = evaluatePrallelly(maxParallel, entries, ([inputFileName, outputFileName]) => {
+    return runSingleInSubprocess({ ...common, inputFileName, outputFileName }, systemModulePath);
   });
+  promise.thenEach(() => succeeded++);
+  promise.catchEach(() => failed++);
+  await promise;
 
-  if (result.errors) {
-    const successCount = result.payload.reduce<number>((acc, curr) => (curr ? acc + 1 : acc), -1);
-    console.log(`Success: ${successCount}, Failed: ${entries.length - successCount}`);
-    return Promise.reject();
-  } else {
-    console.log(`Succeeded: ${entries.length}, Failed: 0`);
-    return;
-  }
+  console.log(`Succeeded: ${succeeded}, Failed: ${failed}`);
+  if (failed) return Promise.reject();
 };
