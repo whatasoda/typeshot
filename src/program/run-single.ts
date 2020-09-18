@@ -6,7 +6,7 @@ import { runWithContext } from '../context';
 import { formatSafely } from '../utils/format-safely';
 import { createSourceFileGetter, createTsProgram } from '../utils/ts-program';
 import { ensureAbsolutePath } from '../utils/converters';
-import { resolveTypeInstance } from './resolve-type-instance';
+import { createIntermediateTypeText } from './intermediate-type/create-type-text';
 import { emitImdFiles } from './emit-intermediate-file';
 import { createIntermediateFiles } from './create-intermediate-files';
 import { collectImportPathTransform } from './collect-import-path-transform';
@@ -51,7 +51,12 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
 
   context.template.forEach((content) => {
     if (content instanceof TypeInstanceObject) {
-      resolveTypeInstance(content, definitions);
+      const { definitionId, value } = content;
+      const definition = definitions.get(definitionId);
+      if (!definition) {
+        throw new Error(`Unknown Type Definition: type definition '${definitionId}' is not found`);
+      }
+      definition.intermediateTypes.set(content, createIntermediateTypeText(value, definition));
     } else if (content instanceof SourceTrace) {
       resolveSourceTrace(inputFile, content);
     }
@@ -76,7 +81,7 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
   let result = '';
   context.template.forEach((content) => {
     if (content instanceof TypeInstanceObject) {
-      result += definitions.get(content.definitionId)!.types.get(content.id)!(content);
+      result += definitions.get(content.definitionId)!.resultTypeGenerators.get(content.id)!(content);
     } else if (content instanceof SourceTrace) {
       result += serializeSourceTrace(sourceText, content, transforms);
     } else {

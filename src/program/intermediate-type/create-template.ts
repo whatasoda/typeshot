@@ -1,7 +1,7 @@
 import ts from 'typescript';
-import { getNodeByStack } from '../utils/ast';
-import { AstTemplate } from '../utils/ast-template';
-import { CodeStack } from '../utils/stack-tracking';
+import { getNodeByStack } from '../../utils/ast';
+import { AstTemplate } from '../../utils/ast-template';
+import { CodeStack } from '../../utils/stack-tracking';
 
 interface TemplateSector {
   types: FragmentAstTemplate[];

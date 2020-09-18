@@ -2,8 +2,8 @@ import ts from 'typescript';
 import { TypeDefinitionInfo, TypeInstance } from '../typeshot';
 import { CodeStack } from '../utils/stack-tracking';
 import { getNodeByPosition, getNodeByStack, getSourceFileByStack } from '../utils/ast';
-import { FragmentTemplate, createFragmentTemplate } from './parse-fragment-type-node';
-import { evaluateMediationTypeNode } from './resolve-type-instance';
+import { FragmentTemplate, createFragmentTemplate } from './intermediate-type/create-template';
+import { evaluateIntermediateTypeNode } from './intermediate-type/evaluate-type-node';
 
 export class TypeDefinition {
   public readonly definition: this;
@@ -14,9 +14,9 @@ export class TypeDefinition {
   public readonly sourceFile: ts.SourceFile;
   public readonly sourceText: string;
   public readonly fragmentTempaltes: Map<string, FragmentTemplate> = new Map();
-  public readonly imdTypes: Map<TypeInstance, string> = new Map();
-  public readonly types: Map<string, (instance: TypeInstance) => string> = new Map();
-  public imdStart: number = 0;
+  public readonly intermediateTypes: Map<TypeInstance, string> = new Map();
+  public readonly resultTypeGenerators: Map<string, (instance: TypeInstance) => string> = new Map();
+  public intermediateFileStart: number = 0;
 
   constructor(definition: TypeDefinitionInfo, getSourceFile: (filename: string) => ts.SourceFile | null) {
     this.definition = this;
@@ -32,11 +32,11 @@ export class TypeDefinition {
 
   public createMediationTypeText(currentContentLength: number): string {
     let acc: string = '';
-    this.imdTypes.forEach((typeString, token) => {
+    this.intermediateTypes.forEach((typeString, token) => {
       acc += `${token.id}: ${typeString};`;
     });
     const typeText = `() => {type _ = {${acc}};}`;
-    this.imdStart = currentContentLength + 16 /* '() => {type _ = ' */;
+    this.intermediateFileStart = currentContentLength + 16 /* '() => {type _ = ' */;
 
     return typeText;
   }
@@ -70,7 +70,7 @@ const varidateTypeDefinition = ({ id, stack }: TypeDefinitionInfo, sourceFile: t
 };
 
 export const resolveImdDefinition = (
-  { sourceFile, imdStart: mediationStart, types }: TypeDefinition,
+  { sourceFile, intermediateFileStart, resultTypeGenerators }: TypeDefinition,
   program: ts.Program,
   checker: ts.TypeChecker,
   printer: ts.Printer,
@@ -79,12 +79,12 @@ export const resolveImdDefinition = (
   const imdFile = program.getSourceFile(sourceFile.fileName);
   if (!imdFile) throw new Error('');
 
-  const { node } = getNodeByPosition(mediationStart, imdFile);
+  const { node } = getNodeByPosition(intermediateFileStart, imdFile);
   if (!ts.isTypeLiteralNode(node)) throw new Error('');
 
   const sourceText = imdFile.getFullText();
   node.members.forEach((member) => {
-    const { id, typeFunc } = evaluateMediationTypeNode(member, sourceText, checker, printer, builderFlags);
-    types.set(id, typeFunc);
+    const { id, generate } = evaluateIntermediateTypeNode(member, sourceText, checker, printer, builderFlags);
+    resultTypeGenerators.set(id, generate);
   });
 };
