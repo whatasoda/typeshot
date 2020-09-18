@@ -43,7 +43,7 @@ export abstract class AstTemplate<T, U extends any[]> {
       acc += this.template[i];
       acc += this.serializeSubstitution(substitution, ...args);
     });
-    acc += this.template[this.template.length - 1];
+    acc += this.template[this.template.length - 1] || '';
     return acc;
   }
 
@@ -78,5 +78,6 @@ export abstract class AstTemplate<T, U extends any[]> {
 
   public freeze() {
     this.isFreezed = true;
+    return true;
   }
 }

@@ -1,10 +1,11 @@
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
-  collectCoverage: true,
   globals: {
     'ts-jest': {
       isolatedModules: true,
     },
   },
+  collectCoverage: true,
+  coveragePathIgnorePatterns: ['/node_modules/', '/test-utils/'],
 };

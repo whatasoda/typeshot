@@ -1,6 +1,6 @@
 import ts from 'typescript';
 import { getFixtures } from '../../../test-utils/getFixtures';
-import { getNodeByStack, getSourceFileByStack } from '../ast';
+import { forEachChildDeep, getNodeByStack, getSourceFileByStack } from '../ast';
 import { CodeStack } from '../stack-tracking';
 
 const fixtrue = getFixtures('sample', true);
@@ -29,14 +29,14 @@ describe('getSourceFileByStack', () => {
 
 describe('getNodeByStack', () => {
   it('returns node and nodePath according to stack information', () => {
-    const { node, nodePath, sourceFile } = getNodeByStack(stack(14, 28), fixtrue);
+    const { node, nodePath, sourceFile } = getNodeByStack(stack(20, 28), fixtrue);
     expect(node.getText()).toBe('registerTypeDefinition');
     expect(nodePath[nodePath.length - 1]).toBe(node);
     expect(sourceFile).toBe(fixtrue);
   });
 
   it('filters nodePath if filterPath is specified', () => {
-    const { node, nodePath, sourceFile } = getNodeByStack(stack(14, 28), fixtrue, ts.isCallExpression);
+    const { node, nodePath, sourceFile } = getNodeByStack(stack(20, 28), fixtrue, ts.isCallExpression);
     expect(node.getText()).toBe('registerTypeDefinition');
     expect(sourceFile).toBe(fixtrue);
 
@@ -48,14 +48,15 @@ typeshot.registerTypeDefinition((fields: FieldDefinition[], makeType) => {
   const resolvedIdSet = new Set<string>();
 
   fields.forEach(({ id, type, required }) => {
-    if (resolvedIdSet.has(id)) throw new Error('A duplicated field id found!');
-    Object.assign(
-      acc,
-      required
-        ? makeType<{ [K in typeof id]-?: TypeMap[typeof type] }>({ id, type })
-        : makeType<{ [K in typeof id]+?: TypeMap[typeof type] }>({ id, type }),
-    );
+    if (resolvedIdSet.has(id)) throw new Error('Duplicated field id found!');
+
+    const t = required
+      ? makeType<{ [K in typeof id]-?: TypeMap[typeof type] } & string[]>({ id, type })
+      : makeType<{ [K in typeof id]+?: TypeMap[typeof type] } & string[]>({ id, type });
+    Object.assign(acc, t);
   });
+  const aaa = 'aaa';
+  (acc as any).aaa = makeType<number | typeof aaa>({ aaa });
 
   return acc;
 })
@@ -71,12 +72,32 @@ typeshot.registerTypeDefinition((fields: FieldDefinition[], makeType) => {
   it('throws error if source file is not created with setParentNodes true', () => {
     const altFixture = getFixtures('sample', false);
     expect(() => {
-      getNodeByStack(stack(14, 28), altFixture);
+      getNodeByStack(stack(20, 28), altFixture);
     }).toThrowError();
   });
 
   it('throws error if stack is not matched with source file', () => {
     expect(() => getNodeByStack(stack(1000, 10), fixtrue)).toThrowError();
-    expect(() => getNodeByStack(stack(14, 29), fixtrue)).toThrowError();
+    expect(() => getNodeByStack(stack(20, 29), fixtrue)).toThrowError();
+  });
+});
+
+describe('forEachChildDeep', () => {
+  it('works correctly', () => {
+    const acc: string[] = [];
+    forEachChildDeep(fixtrue.statements[2], (node) => {
+      acc.push(node.getFullText());
+    });
+    expect(acc.join('\n' + '-'.repeat(20) + '\n')).toMatchSnapshot();
+  });
+  it('works correctly with returning true', () => {
+    const acc: string[] = [];
+    const root = fixtrue.getChildren()[0];
+    forEachChildDeep(root, (node) => {
+      if (node === root) return;
+      acc.push(node.getFullText());
+      return true;
+    });
+    expect(acc.join('\n' + '-'.repeat(20) + '\n')).toMatchSnapshot();
   });
 });

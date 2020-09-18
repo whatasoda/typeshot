@@ -63,7 +63,7 @@ export const forEachChildDeep = (root: ts.Node, callback: (node: ts.Node) => tru
   const stack: ts.Node[] = [root];
   while (stack.length) {
     const node = stack.shift()!;
-    if (callback(node)) {
+    if (callback(node) === true) {
       continue; // skip children
     } else {
       stack.unshift(...node.getChildren());

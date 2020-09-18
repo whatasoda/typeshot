@@ -1,7 +1,7 @@
 import ts from 'typescript';
 import path from 'path';
 
-export const FIXTURE_DIR = path.resolve(__dirname, '../../__fixtures__');
+export const FIXTURE_DIR = path.resolve(__dirname, '../__fixtures__');
 
 export const getFixtures = jest.fn((name: string, setParentNodes: boolean) => {
   const fileName = `${FIXTURE_DIR}/${name}.ts`;
