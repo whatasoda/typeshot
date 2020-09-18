@@ -1,7 +1,7 @@
 import ts from 'typescript';
 import path from 'path';
 import prettier from 'prettier';
-import { SourceTrace, TypeInstanceObject } from '../typeshot';
+import { TypeInstanceObject } from '../typeshot';
 import { runWithContext } from '../context';
 import { formatSafely } from '../utils/format-safely';
 import { createSourceFileGetter, createTsProgram } from '../utils/ts-program';
@@ -10,7 +10,7 @@ import { createIntermediateTypeText } from './intermediate-type/create-type-text
 import { emitIntermediateFiles } from './emit-intermediate-file';
 import { createIntermediateFiles } from './create-intermediate-files';
 import { collectImportPathTransform } from './collect-import-path-transform';
-import { resolveSourceTrace, serializeSourceTrace } from './resolve-source-trace';
+import { resolveSourceTrace, serializeSourceTrace, SourceTrace } from './resolve-source-trace';
 import { TypeDefinition } from './type-definition';
 
 export interface TypeshotOptions {

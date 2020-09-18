@@ -1,4 +1,6 @@
 import { getContext } from './context';
+import { SourceTrace } from './program/resolve-source-trace';
+import type { TypeDefinitionInfo } from './program/type-definition';
 import { reduceTaggedTemplate } from './tagged-template';
 import { CodeStack, withStackTracking } from './utils/stack-tracking';
 
@@ -12,22 +14,6 @@ namespace typeshot {
       constructor(public readonly members: T[]) {}
     }
   }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  export type CreateTypeFragment = <_>(deps: FragmentDependencies) => Readonly<Fragment>;
-  export type Fragment = Record<symbol, FragmentDependencies>;
-  export type FragmentDependencies = Record<string, any>;
-  export type FragmentInfo = CodeStack;
-
-  export interface TypeDefinitionInfo {
-    id: string;
-    stack: CodeStack;
-    fragments: Map<string, FragmentInfo>;
-  }
-  export type TypeDefinitionFactory<T extends object> = (props: T, createTypeFragment: CreateTypeFragment) => any;
-  export type RegisterTypeDefinition = {
-    <T extends object>(factory: TypeDefinitionFactory<T>): (props: T) => TypeInstanceFactory;
-  };
 
   export interface TypeInstanceFactory {
     alias(name: string): TypeInstance;
@@ -53,6 +39,14 @@ namespace typeshot {
   }
   const instanceNextIdMap = new Map<string, number>();
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  export type CreateTypeFragment = <_>(deps: FragmentDependencies) => Readonly<Fragment>;
+  export type Fragment = Record<symbol, FragmentDependencies>;
+  export type FragmentDependencies = Record<string, any>;
+  export type TypeDefinitionFactory<T extends object> = (props: T, createTypeFragment: CreateTypeFragment) => any;
+  type RegisterTypeDefinition = {
+    <T extends object>(factory: TypeDefinitionFactory<T>): (props: T) => TypeInstanceFactory;
+  };
   export const registerTypeDefinition: RegisterTypeDefinition = withStackTracking(
     <T extends object>(definitionStack: CodeStack, factory: TypeDefinitionFactory<T>) => {
       const context = getContext();
@@ -112,16 +106,6 @@ namespace typeshot {
 
   /* Source Trace */
   export type TraceBreakTemplate = (string | (() => string))[];
-  export interface TraceBreak {
-    stack: CodeStack;
-    content: TraceBreakTemplate;
-  }
-  export class SourceTrace {
-    public start: number = 0;
-    public end: number = 0;
-    constructor(public readonly leadingTrace: TraceBreak, public readonly tailingTrace: TraceBreak) {}
-  }
-
   const emptyTemplateStrings: TemplateStringsArray = Object.assign([], { raw: [] });
   export const openTrace = withStackTracking(
     (stack, template: TemplateStringsArray = emptyTemplateStrings, ...substitutions: TraceBreakTemplate) => {
@@ -139,8 +123,7 @@ namespace typeshot {
       if (!context.pendingTrace) throw new Error(`Make sure to open trace before closing trace`);
 
       const content = reduceTaggedTemplate([], template, substitutions, (s) => s);
-      const tailingTrace: TraceBreak = { stack, content };
-      context.template.push(new SourceTrace(context.pendingTrace, tailingTrace));
+      context.template.push(new SourceTrace(context.pendingTrace, { stack, content }));
       context.pendingTrace = null;
     },
   );

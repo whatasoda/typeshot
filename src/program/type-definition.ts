@@ -1,9 +1,16 @@
 import ts from 'typescript';
-import { TypeDefinitionInfo, TypeInstance } from '../typeshot';
+import { TypeInstance } from '../typeshot';
 import { CodeStack } from '../utils/stack-tracking';
 import { getNodeByPosition, getNodeByStack, getSourceFileByStack } from '../utils/ast';
 import { FragmentTemplate, createFragmentTemplate } from './intermediate-type/create-template';
 import { evaluateIntermediateTypeNode } from './intermediate-type/evaluate-type-node';
+
+type FragmentInfo = CodeStack;
+export interface TypeDefinitionInfo {
+  id: string;
+  stack: CodeStack;
+  fragments: Map<string, FragmentInfo>;
+}
 
 export class TypeDefinition {
   public readonly definition: this;

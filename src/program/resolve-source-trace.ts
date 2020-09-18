@@ -1,6 +1,17 @@
 import ts from 'typescript';
-import { SourceTrace } from '../typeshot';
+import { TraceBreakTemplate } from '../typeshot';
 import { getNodeByStack } from '../utils/ast';
+import { CodeStack } from '../utils/stack-tracking';
+
+export interface TraceBreak {
+  stack: CodeStack;
+  content: TraceBreakTemplate;
+}
+export class SourceTrace {
+  public start: number = 0;
+  public end: number = 0;
+  constructor(public readonly leadingTrace: TraceBreak, public readonly tailingTrace: TraceBreak) {}
+}
 
 export type TraceTransformHoleyArray = TraceTransform[] & { [index: number]: TraceTransform | undefined };
 export interface TraceTransform {

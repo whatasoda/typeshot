@@ -1,5 +1,7 @@
 import { REGISTER_INSTANCE, register, RegisterOptions } from 'ts-node';
-import type { PrinterTemplate, TraceBreak, TypeDefinitionInfo } from './typeshot';
+import type { TraceBreak } from './program/resolve-source-trace';
+import type { TypeDefinitionInfo } from './program/type-definition';
+import type { PrinterTemplate } from './typeshot';
 
 export interface TypeshotContext {
   readonly definitionInfoMap: Map<string, TypeDefinitionInfo>;
