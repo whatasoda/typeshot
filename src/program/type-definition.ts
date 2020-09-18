@@ -23,7 +23,7 @@ export class TypeDefinition {
     this.id = definition.id;
     this.stack = definition.stack;
     this.sourceFile = getSourceFileByStack(definition.stack, getSourceFile);
-    [this.start, this.end] = varidateTypeDefinition(definition, this.sourceFile);
+    [this.start, this.end] = varidateTypeDefinitionInfo(definition, this.sourceFile);
     this.sourceText = this.sourceFile.getFullText();
     definition.fragments.forEach((stack, id) => {
       this.fragmentTempaltes.set(id, createFragmentTemplate(id, stack, this.sourceFile, this.sourceText));
@@ -40,16 +40,29 @@ export class TypeDefinition {
 
     return typeText;
   }
+
+  public evaluateIntermediateFile(
+    program: ts.Program,
+    checker: ts.TypeChecker,
+    printer: ts.Printer,
+    builderFlags?: ts.NodeBuilderFlags,
+  ) {
+    const { sourceFile, intermediateFileStart, resultTypeGenerators } = this;
+    const imdFile = program.getSourceFile(sourceFile.fileName);
+    if (!imdFile) throw new Error('');
+
+    const { node } = getNodeByPosition(intermediateFileStart, imdFile);
+    if (!ts.isTypeLiteralNode(node)) throw new Error('');
+
+    const sourceText = imdFile.getFullText();
+    node.members.forEach((member) => {
+      const { id, generate } = evaluateIntermediateTypeNode(member, sourceText, checker, printer, builderFlags);
+      resultTypeGenerators.set(id, generate);
+    });
+  }
 }
 
-export const resolveTypeDefinition = (
-  definition: TypeDefinitionInfo,
-  getSourceFile: (filename: string) => ts.SourceFile | null,
-) => {
-  return new TypeDefinition(definition, getSourceFile);
-};
-
-const varidateTypeDefinition = ({ id, stack }: TypeDefinitionInfo, sourceFile: ts.SourceFile) => {
+const varidateTypeDefinitionInfo = ({ id, stack }: TypeDefinitionInfo, sourceFile: ts.SourceFile) => {
   const { nodePath } = getNodeByStack(stack, sourceFile, ts.isCallExpression);
   const nearestCallExpression = nodePath[nodePath.length - 1];
   const argumentLength = nearestCallExpression.arguments.length;
@@ -67,24 +80,4 @@ const varidateTypeDefinition = ({ id, stack }: TypeDefinitionInfo, sourceFile: t
   }
 
   return [factory.getStart(), factory.getEnd()] as const;
-};
-
-export const resolveImdDefinition = (
-  { sourceFile, intermediateFileStart, resultTypeGenerators }: TypeDefinition,
-  program: ts.Program,
-  checker: ts.TypeChecker,
-  printer: ts.Printer,
-  builderFlags?: ts.NodeBuilderFlags,
-) => {
-  const imdFile = program.getSourceFile(sourceFile.fileName);
-  if (!imdFile) throw new Error('');
-
-  const { node } = getNodeByPosition(intermediateFileStart, imdFile);
-  if (!ts.isTypeLiteralNode(node)) throw new Error('');
-
-  const sourceText = imdFile.getFullText();
-  node.members.forEach((member) => {
-    const { id, generate } = evaluateIntermediateTypeNode(member, sourceText, checker, printer, builderFlags);
-    resultTypeGenerators.set(id, generate);
-  });
 };

@@ -7,11 +7,11 @@ import { formatSafely } from '../utils/format-safely';
 import { createSourceFileGetter, createTsProgram } from '../utils/ts-program';
 import { ensureAbsolutePath } from '../utils/converters';
 import { createIntermediateTypeText } from './intermediate-type/create-type-text';
-import { emitImdFiles } from './emit-intermediate-file';
+import { emitIntermediateFiles } from './emit-intermediate-file';
 import { createIntermediateFiles } from './create-intermediate-files';
 import { collectImportPathTransform } from './collect-import-path-transform';
 import { resolveSourceTrace, serializeSourceTrace } from './resolve-source-trace';
-import { TypeDefinition, resolveTypeDefinition, resolveImdDefinition } from './resolve-type-definition';
+import { TypeDefinition } from './type-definition';
 
 export interface TypeshotOptions {
   inputFileName: string;
@@ -46,7 +46,7 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
 
   const definitions = new Map<string, TypeDefinition>();
   context.definitionInfoMap.forEach((info) => {
-    definitions.set(info.id, resolveTypeDefinition(info, getSourceFile));
+    definitions.set(info.id, new TypeDefinition(info, getSourceFile));
   });
 
   context.template.forEach((content) => {
@@ -62,13 +62,11 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
     }
   });
 
-  const imdFiles = createIntermediateFiles(definitions);
+  const intermediateFiles = createIntermediateFiles(definitions);
   const { program, checker, printer } = createTsProgram(basePath, project, sys, (readFile, path, encoding) => {
-    return imdFiles.get(path) || readFile(path, encoding);
+    return intermediateFiles.get(path) || readFile(path, encoding);
   });
-  definitions.forEach((definition) => {
-    resolveImdDefinition(definition, program, checker, printer);
-  });
+  definitions.forEach((definition) => definition.evaluateIntermediateFile(program, checker, printer));
 
   const sourceText = inputFile.getFullText();
   const transforms = collectImportPathTransform(
@@ -91,15 +89,10 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
 
   sys.writeFile(outputFileName, formatSafely(result, basePath, options.prettierOptions));
   if (options.emitIntermediateFiles) {
-    const imdFileDir = emitImdFiles(
-      sys,
-      path.resolve(__dirname, '../.intermediate-files'),
-      outputFileName,
-      basePath,
-      imdFiles,
-    );
+    const rootDir = path.resolve(__dirname, '../.intermediate-files');
+    const intermediateFileDir = emitIntermediateFiles(sys, rootDir, outputFileName, basePath, intermediateFiles);
     console.log(
-      `Finished '${inputFileName}', result emitted to '${outputFileName}', intermediate files stored in '${imdFileDir}'`,
+      `Finished '${inputFileName}', result emitted to '${outputFileName}', intermediate files stored in '${intermediateFileDir}'`,
     );
   } else {
     console.log(`Finished '${inputFileName}', result emitted to '${outputFileName}'`);

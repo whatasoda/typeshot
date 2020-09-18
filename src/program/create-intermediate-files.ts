@@ -1,5 +1,5 @@
 import ts from 'typescript';
-import { TypeDefinition } from './resolve-type-definition';
+import { TypeDefinition } from './type-definition';
 
 export const createIntermediateFiles = (definitions: Map<string, TypeDefinition>) => {
   const transforms = new Map<ts.SourceFile, TypeDefinition[]>();

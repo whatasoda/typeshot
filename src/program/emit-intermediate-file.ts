@@ -2,7 +2,7 @@ import ts from 'typescript';
 import path from 'path';
 import { getDirectoryLessPath } from '../utils/converters';
 
-export const emitImdFiles = (
+export const emitIntermediateFiles = (
   sys: ts.System,
   destinationDir: string,
   outputFileName: string,

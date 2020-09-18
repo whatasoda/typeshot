@@ -1,7 +1,7 @@
 import { FragmentDependencies, TypeKind } from '../../typeshot';
 import { getSymbolName } from '../../utils/converters';
 import { EVAL, INTEGRATE } from '../intermediate-type/constants';
-import type { TypeDefinition } from '../resolve-type-definition';
+import type { TypeDefinition } from '../type-definition';
 
 export const createIntermediateTypeText = (
   value: any,
