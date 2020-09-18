@@ -1,14 +1,9 @@
 import ts from 'typescript';
 import { TypeDefinitionInfo, TypeInstance } from '../typeshot';
 import { CodeStack } from '../utils/stack-tracking';
-import { forEachChildDeep, getNodeByPosition, getNodeByStack, getSourceFileByStack } from '../utils/ast';
-
-interface TypeFragmentTemplate {
-  fragmentText: string;
-  templateStrings: TemplateStringsArray;
-  /** item should be a dependency name */
-  substitutions: string[];
-}
+import { getNodeByPosition, getNodeByStack, getSourceFileByStack } from '../utils/ast';
+import { ComposedTemplate, parseFragment } from './parse-fragment-type-node';
+import { resolveIntermediateTypeInstance } from './resolve-type-instance';
 
 export class TypeDefinition {
   public readonly id: string;
@@ -16,11 +11,11 @@ export class TypeDefinition {
   public readonly start: number;
   public readonly end: number;
   public readonly rawSourceFile: ts.SourceFile;
-  public readonly fragments: Map<string, TypeFragmentTemplate> = new Map();
+  public readonly fragments: Map<string, ComposedTemplate> = new Map();
   public readonly intermediateTypes: Map<TypeInstance, string> = new Map();
   public readonly intermediateContent: string = '() => {}';
   public readonly intermediateFilePosition: { readonly start: number; readonly end: number } | null = null;
-  public readonly types: Map<string, string> = new Map();
+  public readonly types: Map<string, (instance: TypeInstance) => string> = new Map();
 
   constructor(definition: TypeDefinitionInfo, getSourceFile: (filename: string) => ts.SourceFile | null) {
     this.id = definition.id;
@@ -75,10 +70,11 @@ const parseTypeDefinition = ({ id, stack }: TypeDefinitionInfo, sourceFile: ts.S
 };
 
 const resolveFragments = (
-  acc: Map<string, TypeFragmentTemplate>,
+  acc: Map<string, ComposedTemplate>,
   { fragments }: TypeDefinitionInfo,
   sourceFile: ts.SourceFile,
 ) => {
+  const sourceText = sourceFile.getFullText();
   fragments.forEach((stack, id) => {
     const { nodePath } = getNodeByStack(stack, sourceFile, ts.isCallExpression);
     const nearestCallExpression = nodePath[nodePath.length - 1];
@@ -88,46 +84,16 @@ const resolveFragments = (
         `Invalid Type Argument Range: 'createTypeFragment' requires 1 type argument, but received ${length} at '${id}'`,
       );
     }
-    acc.set(id, parseFragmentTypeNode(nearestCallExpression.typeArguments[0]));
+    acc.set(id, parseFragment(nearestCallExpression.typeArguments[0], sourceText));
   });
 };
 
-const parseFragmentTypeNode = (
-  fragmentTypeNode: ts.TypeNode,
-  sourceText: string = fragmentTypeNode.getSourceFile().getFullText(),
-): TypeFragmentTemplate => {
-  const fragmentText = fragmentTypeNode.getText();
-  const raw: string[] = [];
-  const templateStrings = Object.assign(raw, { raw });
-  const substitutions: string[] = [];
-  let cursor = fragmentTypeNode.getStart();
-  forEachChildDeep(fragmentTypeNode, (node) => {
-    if (ts.isTypeQueryNode(node)) {
-      templateStrings.push(sourceText.slice(cursor, node.getStart()));
-      const dependencyName = node.exprName.getText();
-      substitutions.push(dependencyName);
-      cursor = node.getEnd();
-    }
-  });
-  templateStrings.push(sourceText.slice(cursor, fragmentTypeNode.getEnd()));
-
-  return { fragmentText, templateStrings, substitutions };
-};
-
-const dummySource = ts.createSourceFile('__dummy__.ts', '', ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
-const defaultBuilderFlags =
-  ts.NodeBuilderFlags.InTypeAlias |
-  ts.NodeBuilderFlags.NoTruncation |
-  ts.NodeBuilderFlags.IgnoreErrors |
-  ts.NodeBuilderFlags.GenerateNamesForShadowedTypeParams |
-  ts.NodeBuilderFlags.UseAliasDefinedOutsideCurrentScope |
-  0;
 export const resolveIntermediateDefinition = (
   definition: TypeDefinition,
   program: ts.Program,
   checker: ts.TypeChecker,
   printer: ts.Printer,
-  builderFlags: ts.NodeBuilderFlags = defaultBuilderFlags,
+  builderFlags?: ts.NodeBuilderFlags,
 ) => {
   if (!definition.intermediateFilePosition) throw new Error();
 
@@ -138,16 +104,9 @@ export const resolveIntermediateDefinition = (
   const { node } = getNodeByPosition(pos, sourceFile);
   if (!ts.isTypeLiteralNode(node)) throw new Error('');
 
+  const sourceText = sourceFile.getFullText();
   node.members.forEach((member) => {
-    if (!ts.isPropertySignature(member) || !ts.isNumericLiteral(member.name) || !member.type) throw new Error('');
-
-    const type = checker.getTypeFromTypeNode(member.type);
-    // TODO: extra optimization by myself
-    const resolvedType = checker.typeToTypeNode(type, undefined, builderFlags);
-    if (!resolvedType) throw new Error('');
-
-    // TODO: format
-    const literal = printer.printNode(ts.EmitHint.Unspecified, resolvedType, dummySource);
-    definition.types.set(member.name.text, literal);
+    const { id, typeFunc } = resolveIntermediateTypeInstance(member, sourceText, checker, printer, builderFlags);
+    definition.types.set(id, typeFunc);
   });
 };

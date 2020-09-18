@@ -76,7 +76,8 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
   let result = '';
   context.template.forEach((content) => {
     if (content instanceof TypeInstanceObject) {
-      result += definitions.get(content.definitionId)?.types.get(content.id);
+      const typeText = definitions.get(content.definitionId)?.types.get(content.id)?.(content);
+      result += typeText;
     } else if (content instanceof SourceTrace) {
       result += serializeSourceTrace(sourceText, content, transforms);
     } else {
