@@ -22,14 +22,15 @@ const PropsType = typeshot.registerTypeDefinition((fields: FieldDefinition[], ma
   const resolvedIdSet = new Set<string>();
 
   fields.forEach(({ id, type, required }) => {
-    if (resolvedIdSet.has(id)) throw new Error('A duplicated field id found!');
-    Object.assign(
-      acc,
-      required
-        ? makeType<{ [K in typeof id]-?: TypeMap[typeof type] }>({ id, type })
-        : makeType<{ [K in typeof id]+?: TypeMap[typeof type] }>({ id, type }),
-    );
+    if (resolvedIdSet.has(id)) throw new Error('Duplicated field id found!');
+
+    const t = required
+      ? makeType<{ [K in typeof id]-?: TypeMap[typeof type] } & string[]>({ id, type })
+      : makeType<{ [K in typeof id]+?: TypeMap[typeof type] } & string[]>({ id, type });
+    Object.assign(acc, t);
   });
+  const aaa = 'aaa';
+  (acc as any).aaa = makeType<number | typeof aaa>({ aaa });
 
   return acc;
 });
