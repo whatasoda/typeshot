@@ -2,6 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "rootDir": "src",
+    "outDir": "lib",
+    "declaration": true,
   },
   "exclude": ["node_modules", "**/__tests__/**/*", "**/__fixtures__/**/*", "src/.intermediate-files/**/*"],
   "include": ["src/**/*"],

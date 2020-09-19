@@ -20,14 +20,21 @@ describe('getDirectoryLessPath', () => {
 
 describe('ensureAbsolutePath', () => {
   it.each`
-    p                  | basePath      | expected
-    ${'typescript'}    | ${'/foo/bar'} | ${'typescript'}
-    ${'typescript.ts'} | ${'/foo/bar'} | ${'typescript.ts'}
-    ${'/baz/qux.ts'}   | ${'/foo/bar'} | ${'/baz/qux.ts'}
-    ${'./baz/qux.ts'}  | ${'/foo/bar'} | ${'/foo/bar/baz/qux.ts'}
-    ${'../baz/qux.ts'} | ${'/foo/bar'} | ${'/foo/baz/qux.ts'}
+    p                  | basePath      | expected                    | maybeModule
+    ${'typescript'}    | ${'/foo/bar'} | ${'typescript'}             | ${true}
+    ${'typescript'}    | ${'/foo/bar'} | ${'/foo/bar/typescript'}    | ${false}
+    ${'typescript.ts'} | ${'/foo/bar'} | ${'typescript.ts'}          | ${true}
+    ${'typescript.ts'} | ${'/foo/bar'} | ${'/foo/bar/typescript.ts'} | ${false}
+    ${'/baz/qux.ts'}   | ${'/foo/bar'} | ${'/baz/qux.ts'}            | ${false}
+    ${'./baz/qux.ts'}  | ${'/foo/bar'} | ${'/foo/bar/baz/qux.ts'}    | ${false}
+    ${'../baz/qux.ts'} | ${'/foo/bar'} | ${'/foo/baz/qux.ts'}        | ${false}
   `("returns '$expected' if received ('$p', '$basePath')", (data) => {
-    const { p, basePath, expected } = data as { expected: string; p: string; basePath: string };
-    expect(ensureAbsolutePath(p, basePath)).toBe(expected);
+    const { p, basePath, expected, maybeModule } = data as {
+      expected: string;
+      p: string;
+      basePath: string;
+      maybeModule: boolean;
+    };
+    expect(ensureAbsolutePath(p, basePath, maybeModule)).toBe(expected);
   });
 });

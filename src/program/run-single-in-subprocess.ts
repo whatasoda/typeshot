@@ -12,7 +12,7 @@ export const runSingleInSubprocess = (
 ) => {
   return new Promise<void>((resolve, reject) => {
     const cp = fork(__filename, { execArgv });
-    cp.send([options, ensureAbsolutePath(systemModulePath, options.basePath || process.cwd())]);
+    cp.send([options, ensureAbsolutePath(systemModulePath, options.basePath || process.cwd(), true)]);
     cp.stdout?.pipe(process.stdout);
     cp.stderr?.pipe(process.stderr);
     cp.on('close', (code) => (code === 0 ? resolve() : reject()));

@@ -11,6 +11,12 @@ export const getDirectoryLessPath = (p: string, basePath: string) => {
     .replace(/\//g, '.');
 };
 
-export const ensureAbsolutePath = (p: string, basePath: string) => {
-  return p.startsWith(path.sep) ? p : /^\.+\//.test(p) ? path.resolve(basePath, p) : p;
+export const ensureAbsolutePath = (p: string, basePath: string, maybeLibrary: boolean = false) => {
+  if (p.startsWith(path.sep)) {
+    return p;
+  } else if (!maybeLibrary || /^\.+\//.test(p)) {
+    return path.resolve(basePath, p);
+  } else {
+    return p;
+  }
 };

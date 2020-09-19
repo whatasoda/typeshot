@@ -35,7 +35,7 @@ export const runWithContext = async (
     require(filename);
     await context.promise;
   } catch (e) {
-    console.log(e instanceof Error ? e.message : e);
+    console.log(process.env.NODE_ENV === 'test' && e instanceof Error ? e.message : e);
   }
   return context;
 };
