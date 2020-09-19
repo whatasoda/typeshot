@@ -1,3 +1,4 @@
+import path from 'path';
 import { REGISTER_INSTANCE, register, RegisterOptions } from 'ts-node';
 import type { TraceBreak } from './program/resolve-source-trace';
 import type { TypeDefinitionInfo } from './program/type-definition';
@@ -10,12 +11,11 @@ export interface TypeshotContext {
   promise?: Promise<void>;
 }
 
-const CURRENT_TYPESHOT_CONTEXT = { current: null as null | TypeshotContext };
+let current_typeshot_context: TypeshotContext | null = null;
 
 export const getContext = () => {
-  const context = CURRENT_TYPESHOT_CONTEXT.current;
-  if (context) return context;
-  throw new Error('Context Missed: Make sure to run via typeshot program');
+  if (current_typeshot_context) return current_typeshot_context;
+  throw new Error("no context found: make sure to use 'typeshot/program'");
 };
 
 export const runWithContext = async (
@@ -23,16 +23,19 @@ export const runWithContext = async (
   context: TypeshotContext,
   registerOptions?: RegisterOptions,
 ): Promise<TypeshotContext> => {
-  if (CURRENT_TYPESHOT_CONTEXT.current) {
-    throw new Error('Invalid Operation: typeshot cannot evaluate multiple files at the same time in the same context');
+  if (current_typeshot_context) {
+    throw new Error("context duplicatad: make sure to use 'typeshot/program'");
+  }
+  if (!path.isAbsolute(filename)) {
+    throw new Error('filename should be absolute path');
   }
   try {
     if (!(REGISTER_INSTANCE in process)) register({ ...registerOptions, transpileOnly: true });
-    CURRENT_TYPESHOT_CONTEXT.current = context;
+    current_typeshot_context = context;
     require(filename);
     await context.promise;
   } catch (e) {
-    console.log(e);
+    console.log(e instanceof Error ? e.message : e);
   }
   return context;
 };
