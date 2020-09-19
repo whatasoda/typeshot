@@ -1,4 +1,5 @@
-import { FragmentDependencies, TypeKind } from '../../typeshot';
+import { FragmentDependencies } from '../../typeshot/register-type-definition';
+import { TypeKind } from '../../typeshot/type-kind';
 import { getSymbolName } from '../../utils/converters';
 import { EVAL, INTEGRATE } from '../intermediate-type/constants';
 import type { TypeDefinition } from '../type-definition';

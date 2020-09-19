@@ -1,4 +1,4 @@
-import { getContext } from '../src/context';
+import { getContext } from '../src/program/context';
 
 (getContext() as any).test();
 

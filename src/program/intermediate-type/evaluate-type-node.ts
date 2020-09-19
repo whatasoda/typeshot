@@ -1,5 +1,5 @@
 import ts from 'typescript';
-import { TypeInstance } from '../../typeshot';
+import { TypeInstance } from '../../typeshot/type-instance';
 import { AstTemplate } from '../../utils/ast-template';
 import { defaultBuilderFlags, dummyFile, INTEGRATE, patternEVAL } from './constants';
 

@@ -6,7 +6,7 @@
   "scripts": {
     "build": "rimraf ./lib && tsc -p tsconfig.lib.json && cp package.json README.md LICENSE ./lib",
     "test": "jest",
-    "prepare": "mkdir -p node_modules/typeshot && echo \"module.exports = require('../../src')\" > node_modules/typeshot/index.js"
+    "prepare": "mkdir -p node_modules/typeshot && echo \"import m = require('../../src'); export = m;\" > node_modules/typeshot/index.ts"
   },
   "bin": "cli/bin.js",
   "repository": {

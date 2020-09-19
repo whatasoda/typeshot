@@ -1,8 +1,7 @@
 import ts from 'typescript';
 import path from 'path';
 import prettier from 'prettier';
-import { TypeInstanceObject } from '../typeshot';
-import { runWithContext } from '../context';
+import { runWithContext } from './context';
 import { formatSafely } from '../utils/format-safely';
 import { createSourceFileGetter, createTsProgram } from '../utils/ts-program';
 import { ensureAbsolutePath } from '../utils/converters';
@@ -10,8 +9,10 @@ import { createIntermediateTypeText } from './intermediate-type/create-type-text
 import { emitIntermediateFiles } from './emit-intermediate-file';
 import { createIntermediateFiles } from './create-intermediate-files';
 import { collectImportPathTransform } from './collect-import-path-transform';
-import { resolveSourceTrace, serializeSourceTrace, SourceTrace } from './resolve-source-trace';
+import { resolveSourceTrace, serializeSourceTrace } from './resolve-source-trace';
 import { TypeDefinition } from './type-definition';
+import { isSourceTrace } from '../typeshot/source-trace';
+import { isTypeInstance } from '../typeshot/type-instance';
 
 export interface TypeshotOptions {
   inputFileName: string;
@@ -50,14 +51,14 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
   });
 
   context.template.forEach((content) => {
-    if (content instanceof TypeInstanceObject) {
+    if (isTypeInstance(content)) {
       const { definitionId, value } = content;
       const definition = definitions.get(definitionId);
       if (!definition) {
         throw new Error(`Unknown Type Definition: type definition '${definitionId}' is not found`);
       }
       definition.intermediateTypes.set(content, createIntermediateTypeText(value, definition));
-    } else if (content instanceof SourceTrace) {
+    } else if (isSourceTrace(content)) {
       resolveSourceTrace(inputFile, content);
     }
   });
@@ -78,9 +79,9 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
 
   let result = '';
   context.template.forEach((content) => {
-    if (content instanceof TypeInstanceObject) {
+    if (isTypeInstance(content)) {
       result += definitions.get(content.definitionId)!.resultTypeGenerators.get(content.id)!(content);
-    } else if (content instanceof SourceTrace) {
+    } else if (isSourceTrace(content)) {
       result += serializeSourceTrace(sourceText, content, transforms);
     } else {
       result += content;

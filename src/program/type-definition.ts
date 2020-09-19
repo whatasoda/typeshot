@@ -1,6 +1,6 @@
 import ts from 'typescript';
-import { TypeInstance } from '../typeshot';
 import { CodeStack } from '../utils/stack-tracking';
+import { TypeInstance } from '../typeshot/type-instance';
 import { getNodeByPosition, getNodeByStack, getSourceFileByStack } from '../utils/ast';
 import { FragmentTemplate, createFragmentTemplate } from './intermediate-type/create-template';
 import { evaluateIntermediateTypeNode } from './intermediate-type/evaluate-type-node';

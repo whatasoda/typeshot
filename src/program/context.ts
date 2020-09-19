@@ -1,13 +1,13 @@
 import path from 'path';
 import { REGISTER_INSTANCE, register, RegisterOptions } from 'ts-node';
-import type { TraceBreak } from './program/resolve-source-trace';
-import type { TypeDefinitionInfo } from './program/type-definition';
-import type { PrinterTemplate } from './typeshot';
+import type { TypeDefinitionInfo } from './type-definition';
+import type { PrinterTemplate } from '../typeshot/printer';
+import type { TraceBreakpoint } from '../typeshot/source-trace';
 
 export interface TypeshotContext {
   readonly definitionInfoMap: Map<string, TypeDefinitionInfo>;
   readonly template: PrinterTemplate;
-  pendingTrace: TraceBreak | null;
+  pendingTrace: TraceBreakpoint | null;
   promise?: Promise<void>;
 }
 
