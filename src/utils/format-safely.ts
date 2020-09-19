@@ -11,7 +11,7 @@ export const formatSafely = (rawContent: string, basePath: string, options: Opti
         : options || resolveConfig.sync(basePath)) || defaultPrettierOptions;
     return format(rawContent, options);
   } catch (e) {
-    console.log(e);
+    console.log(e.message);
     return rawContent;
   }
 };
