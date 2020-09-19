@@ -1,7 +1,7 @@
 import { getContext } from './context';
 import { SourceTrace } from './program/resolve-source-trace';
 import type { TypeDefinitionInfo } from './program/type-definition';
-import { reduceTaggedTemplate } from './tagged-template';
+import { reduceTaggedTemplate } from './utils/tagged-template';
 import { CodeStack, withStackTracking } from './utils/stack-tracking';
 
 namespace typeshot {

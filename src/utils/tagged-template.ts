@@ -1,6 +1,6 @@
 export const reduceTaggedTemplate = <T, U>(
   acc: (string | T)[],
-  templateArray: TemplateStringsArray,
+  templateArray: TemplateStringsArray | readonly string[],
   substitutions: U[],
   stringify: (substitution: U) => string | T,
 ) => {
