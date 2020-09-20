@@ -1,8 +1,6 @@
 name: Test
 
 on:
-  push:
-    branches: master
   pull_request:
     branches: master
 
@@ -23,6 +21,6 @@ jobs:
     - run: npm ci
     - run: |
         npm test
-      # bash <(curl -s https://codecov.io/bash) -t ${{ secrets.codecov_token }}
+        bash <(curl -s https://codecov.io/bash) -t ${{ secrets.codecov_token }}
       env:
         CI: true
