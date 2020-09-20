@@ -3,17 +3,20 @@ import arg from 'arg';
 import path from 'path';
 import { runSingleInSubprocess } from '../program/run-single-in-subprocess';
 import { runMultiple, TypeshotCommonOptions } from '../program/run-multiple';
+import { ensureAbsolutePath } from '../utils/converters';
 
 const CWD = process.cwd();
 const DEFAULT_MAX_PARALLEL = 3;
 
+export type CLIOptions = ReturnType<typeof normalizeOptions>;
+
 interface CLIOptionsWide {
-  project?: string;
-  basePath?: string;
   inputFile?: string;
   inputFiles?: string[];
   outFile?: string;
   outDir?: string;
+  basePath?: string;
+  project?: string;
   rootDir?: string;
   emitIntermediateFiles?: boolean;
   prettierConfig?: string;
@@ -22,12 +25,12 @@ interface CLIOptionsWide {
 }
 
 type Base = Omit<CLIOptionsWide, 'inputFile' | 'outFile' | 'outDir' | 'inputFiles'>;
-export type CLIOptions =
+type CLIOptionsValidated =
   | ({ inputFile: string; outFile: string } & Base)
   | ({ inputFile: string; outDir: string } & Base)
   | ({ inputFiles: string[]; outDir: string } & Base);
 
-export const validateOptions = (options: CLIOptionsWide): CLIOptions => {
+export const validateOptions = (options: CLIOptionsWide): CLIOptionsValidated => {
   if (!options.inputFile && !options.inputFiles?.length) {
     exitWithHelp('Make sure to specify --inputFile or input file list.');
   }
@@ -51,7 +54,26 @@ export const validateOptions = (options: CLIOptionsWide): CLIOptions => {
     delete options.inputFile;
     delete options.outFile;
   }
-  return options as CLIOptions;
+  return options as CLIOptionsValidated;
+};
+
+export const normalizeOptions = (options: CLIOptionsValidated) => {
+  const basePath = options.basePath ? ensureAbsolutePath(options.basePath, CWD) : CWD;
+  const rootDir = options.rootDir ? ensureAbsolutePath(options.rootDir, basePath) : basePath;
+
+  if ('inputFile' in options) {
+    options.inputFile = ensureAbsolutePath(options.inputFile, basePath);
+    if ('outFile' in options) {
+      options.outFile = ensureAbsolutePath(options.outFile, basePath);
+    } else {
+      options.outDir = ensureAbsolutePath(options.outDir, basePath);
+    }
+  } else {
+    options.inputFiles = options.inputFiles.map((inputFile) => ensureAbsolutePath(inputFile, basePath));
+    options.outDir = ensureAbsolutePath(options.outDir, basePath);
+  }
+
+  return { ...options, basePath, rootDir };
 };
 
 export const parseCLIOptions = (argv: string[]) => {
@@ -89,6 +111,7 @@ export const parseCLIOptions = (argv: string[]) => {
     '--inputFile': inputFile,
     '--outFile': outFile,
     '--outDir': outDir,
+    '--rootDir': rootDir,
     '--basePath': basePath,
     '--emitIntermediateFiles': emitIntermediateFiles,
     '--prettierConfig': prettierConfig,
@@ -98,18 +121,21 @@ export const parseCLIOptions = (argv: string[]) => {
 
   if (help) exitWithHelp();
 
-  return validateOptions({
-    inputFile,
-    inputFiles,
-    outFile,
-    outDir,
-    project,
-    basePath,
-    emitIntermediateFiles,
-    prettierConfig,
-    systemModule,
-    maxParallel,
-  });
+  return normalizeOptions(
+    validateOptions({
+      inputFile,
+      inputFiles,
+      outFile,
+      outDir,
+      project,
+      basePath,
+      rootDir,
+      emitIntermediateFiles,
+      prettierConfig,
+      systemModule,
+      maxParallel,
+    }),
+  );
 };
 
 const exitWithHelp = (error?: string) => {
@@ -123,11 +149,10 @@ Help:
 };
 
 export const resolveOutputFileName = (cliOptions: CLIOptions, inputFileName: string) => {
-  const { basePath, rootDir } = cliOptions;
   if ('outFile' in cliOptions) {
     return cliOptions.outFile;
   } else {
-    const localName = path.relative(rootDir || basePath || CWD, inputFileName);
+    const localName = path.relative(cliOptions.rootDir, inputFileName);
     if (/^\.\.\//.test(localName)) {
       throw new Error(`Invalid rootDir: Make sure to place input files under rootDir.`);
     }

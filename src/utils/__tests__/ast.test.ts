@@ -43,7 +43,7 @@ describe('getNodeByStack', () => {
     const nearest = nodePath[nodePath.length - 1];
     expect(nearest).not.toBe(node);
     expect('\n' + nearest.getText() + '\n').toBe(`
-typeshot.registerTypeDefinition((fields: FieldDefinition[], makeType) => {
+typeshot.registerTypeDefinition((makeType, fields: FieldDefinition[]) => {
   const acc = {};
   const resolvedIdSet = new Set<string>();
 

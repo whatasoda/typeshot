@@ -9,8 +9,8 @@ export type Fragment = Record<symbol, FragmentDependencies>;
 export type FragmentDependencies = Record<string, any>;
 
 export const registerTypeDefinition: {
-  <T extends object>(factory: (props: T, createTypeFragment: CreateTypeFragment) => any): {
-    (props: T): TypeInstanceFactory;
+  <T extends any[]>(factory: (createTypeFragment: CreateTypeFragment, ...args: T) => any): {
+    (...args: T): TypeInstanceFactory;
   };
 } = withStackTracking((definitionStack, factory) => {
   const context = getContext();
@@ -22,7 +22,7 @@ export const registerTypeDefinition: {
   };
   context.definitionInfoMap.set(definitionId, definitionInfo);
 
-  return (props): TypeInstanceFactory => {
+  return (...args): TypeInstanceFactory => {
     const { fragments } = definitionInfo;
     const createTypeFragment: CreateTypeFragment = withStackTracking(
       (fragmentStack, dependencies): Fragment => {
@@ -36,7 +36,7 @@ export const registerTypeDefinition: {
       },
     );
 
-    const value = factory(props, createTypeFragment);
+    const value = factory(createTypeFragment, ...args);
     return createTypeInstanceFactory(definitionId, value);
   };
 });

@@ -4,7 +4,6 @@ import prettier from 'prettier';
 import { runWithContext } from './context';
 import { formatSafely } from '../utils/format-safely';
 import { createSourceFileGetter, createTsProgram } from '../utils/ts-program';
-import { ensureAbsolutePath } from '../utils/converters';
 import { createIntermediateTypeText } from './intermediate-type/create-type-text';
 import { emitIntermediateFiles } from './emit-intermediate-file';
 import { createIntermediateFiles } from './create-intermediate-files';
@@ -15,9 +14,12 @@ import { isSourceTrace } from '../typeshot/source-trace';
 import { isTypeInstance } from '../typeshot/type-instance';
 
 export interface TypeshotOptions {
+  /** should be absolute path */
   inputFileName: string;
+  /** should be absolute path */
   outputFileName: string;
-  basePath?: string;
+  /** should be absolute path */
+  basePath: string;
   project?: string;
   prettierOptions?: prettier.Options | string;
   emitIntermediateFiles?: boolean;
@@ -30,9 +32,7 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
   } else {
     isCalled = true;
   }
-  const { basePath = process.cwd(), project = 'tsconfig.json' } = options;
-  const inputFileName = ensureAbsolutePath(options.inputFileName, basePath);
-  const outputFileName = ensureAbsolutePath(options.outputFileName, basePath);
+  const { basePath, inputFileName, outputFileName, project = 'tsconfig.json' } = options;
   console.log(`Processing '${inputFileName}'...`);
 
   const getSourceFile = createSourceFileGetter(sys);
