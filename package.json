@@ -1,7 +1,7 @@
 {
   "name": "typeshot",
   "version": "2.0.3",
-  "description": "`typeshot` is a general purpose code generator for TypeScript, especially focusing to generate type definitions without complex advanced types and TypeScript Compiler API.",
+  "description": "typeshot is a general purpose code generator for TypeScript, especially focusing to generate type definitions without complex advanced types and TypeScript Compiler API.",
   "main": "index.js",
   "scripts": {
     "build": "rimraf ./lib && tsc -p tsconfig.lib.json && cp package.json README.md LICENSE ./lib",
