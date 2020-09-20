@@ -7,5 +7,6 @@ module.exports = {
     },
   },
   collectCoverage: true,
-  coveragePathIgnorePatterns: ['/node_modules/', '/test-utils/'],
+  collectCoverageFrom: ['src/**/*.{ts,tsx}'],
+  coveragePathIgnorePatterns: ['/node_modules/', '/test-utils/', '/.intermediate-files/'],
 };
