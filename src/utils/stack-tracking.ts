@@ -5,29 +5,30 @@ export interface CodeStack {
   col: number;
 }
 
-const parseStack = (stack: string = '', depth: number): CodeStack => {
+const parseStack = (stack: string, depth: number): CodeStack => {
   if (!stack) throw new Error('Invalid Stack Information: make sure to run with node');
-  stack = stack.replace(/^Error:\s+\n/, '');
-  for (let i = depth; stack && i > 0; i--) {
-    stack = stack.slice(stack.indexOf('\n') + 1);
+  let cursor = 0;
+  for (let i = depth + 1; stack && i > 0; i--) {
+    cursor = stack.indexOf('\n', cursor) + 1;
   }
-  stack = stack.replace(/^\s+at\s.+\((.+)\)$/m, '$1');
+  // Ignore the case if the stack doesn't include any new line
+  const composed = stack
+    .slice(cursor + /* '____at_' ('_'=' ') */ 7, stack.indexOf('\n', cursor))
+    .replace(STACK_PARENTHESES, '');
 
   if (!stack) throw new Error('Invalid Stack Information: invalid depth');
-  const tailingNewLineIndex = stack.indexOf('\n');
-  const composed = tailingNewLineIndex === -1 ? stack : stack.slice(0, tailingNewLineIndex);
   const [filename, line, col] = composed.split(':');
-
   return { composed, filename, line: ~~line, col: ~~col };
 };
+const STACK_PARENTHESES = /(^.+\(|\)$)/g;
 
-const getCachedStack = (stack: string = '', depth: number, cacheStore: Map<string, CodeStack>) => {
-  const result = parseStack(stack, depth);
-  const cached = cacheStore.get(result.composed);
-  return cached || result;
-};
-
+const target = Object.create(null) as { stack: string };
+const cacheStore = new Map<string, CodeStack>();
 export const withStackTracking = <T, U extends any[]>(func: (stack: CodeStack, ...args: U) => T) => {
-  const cacheStore = new Map<string, CodeStack>();
-  return (...args: U) => func(getCachedStack(new Error().stack, 1, cacheStore), ...args);
+  return (...args: U) => {
+    Error.stackTraceLimit = 2;
+    Error.captureStackTrace(target);
+    Error.stackTraceLimit = 10;
+    return func(cacheStore.get(target.stack) || parseStack(target.stack, 1), ...args);
+  };
 };
