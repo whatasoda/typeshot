@@ -17,7 +17,7 @@ export interface FieldDefinition {
 
 typeshot.closeTrace();
 
-const PropsType = typeshot.registerTypeDefinition((fields: FieldDefinition[], makeType) => {
+const PropsType = typeshot.registerTypeDefinition((makeType, fields: FieldDefinition[]) => {
   const acc = {};
   const resolvedIdSet = new Set<string>();
 

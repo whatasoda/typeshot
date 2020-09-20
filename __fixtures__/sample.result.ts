@@ -11,12 +11,12 @@ export interface FieldDefinition {
   required: boolean;
 }
 
-export type Hoge = {
+export type Hoge = string[] & {
   foo?: number | undefined;
   bar: number;
   baz?: string | undefined;
   qux: string;
   aaa: number | 'aaa';
-} & string[];
+};
 
 // hogehoge
