@@ -4,12 +4,16 @@ import { TypeInstance } from '../typeshot/type-instance';
 import { getNodeByPosition, getNodeByStack, getSourceFileByStack } from '../utils/ast';
 import { FragmentTemplate, createFragmentTemplate } from './intermediate-type/create-template';
 import { evaluateIntermediateTypeNode } from './intermediate-type/evaluate-type-node';
+import { TypeFragmentInfoInit } from '../typeshot/register-type-definition';
 
-type FragmentInfo = CodeStack;
+export interface TypeFragmentInfo extends TypeFragmentInfoInit {
+  id: string;
+  stack: CodeStack;
+}
 export interface TypeDefinitionInfo {
   id: string;
   stack: CodeStack;
-  fragments: Map<string, FragmentInfo>;
+  fragments: Map<string, TypeFragmentInfo>;
 }
 
 export class TypeDefinition {
@@ -32,8 +36,8 @@ export class TypeDefinition {
     this.sourceFile = getSourceFileByStack(definition.stack, getSourceFile);
     [this.start, this.end] = varidateTypeDefinitionInfo(definition, this.sourceFile);
     this.sourceText = this.sourceFile.getFullText();
-    definition.fragments.forEach((stack, id) => {
-      this.fragmentTempaltes.set(id, createFragmentTemplate(id, stack, this.sourceFile, this.sourceText));
+    definition.fragments.forEach((fragment, id) => {
+      this.fragmentTempaltes.set(id, createFragmentTemplate(fragment, this.sourceFile, this.sourceText));
     });
   }
 

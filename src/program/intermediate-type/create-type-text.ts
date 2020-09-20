@@ -116,5 +116,5 @@ const finalizeIntermediateTypeText = (
     result.push(`{${nestedInsolubleSigs.join('')}}`);
   }
 
-  return result.join(' & ');
+  return result.join(' & ') || '{}';
 };
