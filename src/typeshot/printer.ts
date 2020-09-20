@@ -3,7 +3,7 @@ import { reduceTaggedTemplate } from '../utils/tagged-template';
 import { SourceTrace } from './source-trace';
 import { isTypeInstance, TypeInstance } from './type-instance';
 
-export type PrinterSubtitution = string | number | boolean | undefined | null | TypeInstance;
+export type PrinterSubtitution = string | number | boolean | undefined | null | TypeInstance | PrinterTemplate;
 export type PrinterTemplate = (string | TypeInstance | SourceTrace)[];
 
 const stringifySubstitution = (substitution: PrinterSubtitution): PrinterTemplate[number] => {

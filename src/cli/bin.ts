@@ -141,9 +141,47 @@ export const parseCLIOptions = (argv: string[]) => {
 const exitWithHelp = (error?: string) => {
   if (error) console.log(error);
   console.log(`
-typeshot
+SYNOPSIS
+typeshot [--outFile <path> | --outDir <path>] [--basePath <path>] [--rootDir <dir>] [--project <path>]
+          [--prettierConfig <path>] [--systemModule <path>] [--maxParallel <count>] [--emitIntermediateFiles]
+          [--inputFile <path> | [--] <path>...]
 
-Help:
+OPTIONS
+        <path>...
+            input file paths
+
+        -h, --help
+            display this message
+
+        -i, --inputFile
+            input file path
+
+        -o, --outFile
+            output file path, make sure to use with --inputFile
+
+        -O, --outDir
+            output directory path
+
+        -b, --basePath
+            base path to resolve relative paths, default value is process.cwd()
+
+        -p, --project
+            tsconfig path, default value is tsconfig.json
+
+        --rootDir
+            root directory to resolve output file path with outDir, basePath is used if omitted
+
+        --prettierConfig
+            prettier config path
+
+        --systemModule
+            see README.md about detail, default value is 'typescript'
+
+        --maxParallel
+            max number of subprocess, default value is 3
+
+        -E, --emitIntermediateFiles
+            whether to emit intermediate files, default value is false
 `);
   process.exit(error ? 1 : 0);
 };

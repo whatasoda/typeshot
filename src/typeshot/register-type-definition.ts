@@ -4,9 +4,15 @@ import { withStackTracking } from '../utils/stack-tracking';
 import { createTypeInstanceFactory, TypeInstanceFactory } from './type-instance';
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export type CreateTypeFragment = <_>(deps: FragmentDependencies) => Readonly<Fragment>;
-export type Fragment = Record<symbol, FragmentDependencies>;
+export type CreateTypeFragment = <_>(
+  deps: FragmentDependencies,
+  options?: TypeFragmentInfoInit,
+) => Readonly<TypeFragment>;
+export type TypeFragment = Record<symbol, FragmentDependencies>;
 export type FragmentDependencies = Record<string, any>;
+export interface TypeFragmentInfoInit {
+  forceIntegrate?: boolean;
+}
 
 export const registerTypeDefinition: {
   <T extends any[]>(factory: (createTypeFragment: CreateTypeFragment, ...args: T) => any): {
@@ -24,17 +30,14 @@ export const registerTypeDefinition: {
 
   return (...args): TypeInstanceFactory => {
     const { fragments } = definitionInfo;
-    const createTypeFragment: CreateTypeFragment = withStackTracking(
-      (fragmentStack, dependencies): Fragment => {
-        // TODO: put some comment
-        const fragmentId = `fragment@${fragmentStack.composed}`;
-        if (!fragments.has(fragmentId)) {
-          fragments.set(fragmentId, fragmentStack);
-        }
+    const createTypeFragment: CreateTypeFragment = withStackTracking((fragmentStack, dependencies, options = {}) => {
+      const fragmentId = `fragment@${fragmentStack.composed}`;
+      if (!fragments.has(fragmentId)) {
+        fragments.set(fragmentId, { ...options, id: fragmentId, stack: fragmentStack });
+      }
 
-        return Object.assign(Object.create(null), { [Symbol(fragmentId)]: dependencies });
-      },
-    );
+      return Object.assign(Object.create(null), { [Symbol(fragmentId)]: dependencies });
+    });
 
     const value = factory(createTypeFragment, ...args);
     return createTypeInstanceFactory(definitionId, value);

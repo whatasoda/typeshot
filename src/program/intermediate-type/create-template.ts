@@ -1,7 +1,7 @@
 import ts from 'typescript';
 import { getNodeByStack } from '../../utils/ast';
 import { AstTemplate } from '../../utils/ast-template';
-import { CodeStack } from '../../utils/stack-tracking';
+import { TypeFragmentInfo } from '../type-definition';
 
 interface TemplateSector {
   types: FragmentAstTemplate[];
@@ -34,21 +34,29 @@ export class FragmentAstTemplate extends AstTemplate<string, [dependencies: Map<
 }
 
 export const createFragmentTemplate = (
-  fragmentId: string,
-  stack: CodeStack,
+  fragmentInfo: TypeFragmentInfo,
   sourceFile: ts.SourceFile,
   sourceText: string,
 ): FragmentTemplate => {
-  const { nodePath } = getNodeByStack(stack, sourceFile, ts.isCallExpression);
+  const { nodePath } = getNodeByStack(fragmentInfo.stack, sourceFile, ts.isCallExpression);
   const nearestCallExpression = nodePath[nodePath.length - 1];
   if (!nearestCallExpression.typeArguments || nearestCallExpression.typeArguments.length !== 1) {
     const length = nearestCallExpression.typeArguments?.length || 0;
     throw new RangeError(
-      `Invalid Type Argument Range: 'createTypeFragment' requires 1 type argument, but received ${length} at '${fragmentId}'`,
+      `Invalid Type Argument Range: 'createTypeFragment' requires 1 type argument, but received ${length} at '${fragmentInfo.id}'`,
     );
   }
 
   const node = nearestCallExpression.typeArguments[0];
+  if (fragmentInfo.forceIntegrate) {
+    return {
+      solubleSigs: null,
+      solubleTypes: new FragmentAstTemplate(node, sourceText).wrap('(', ')'),
+      insolubleSigs: null,
+      insolubleTypes: null,
+    };
+  }
+
   const { soluble: S, insoluble: I } = parseFragmentTypeNode(undefined, node, sourceText);
   return {
     solubleSigs: S.sigs.length ? new FragmentAstTemplate(null).append(S.sigs) : null,
