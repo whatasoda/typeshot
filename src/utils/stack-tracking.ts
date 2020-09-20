@@ -5,15 +5,14 @@ export interface CodeStack {
   col: number;
 }
 
-const parseStack = (stack: string, depth: number): CodeStack => {
-  if (!stack) throw new Error('Invalid Stack Information: make sure to run with node');
+export const parseStack = (stack: string, depth: number): CodeStack => {
   let cursor = 0;
   for (let i = depth + 1; stack && i > 0; i--) {
-    cursor = stack.indexOf('\n', cursor) + 1;
+    cursor = stack.indexOf('\n', cursor + 1);
   }
-  // Ignore the case if the stack doesn't include any new line
+  cursor = (cursor === -1 ? stack.lastIndexOf('\n') : cursor) + 8 /* '____at_' */;
   const composed = stack
-    .slice(cursor + /* '____at_' ('_'=' ') */ 7, stack.indexOf('\n', cursor))
+    .slice(cursor, (stack.indexOf('\n', cursor) + 1 || Infinity) - 1)
     .replace(STACK_PARENTHESES, '');
 
   if (!stack) throw new Error('Invalid Stack Information: invalid depth');
