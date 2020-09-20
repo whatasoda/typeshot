@@ -1,4 +1,4 @@
-import { withStackTracking } from '../stack-tracking';
+import { parseStack, withStackTracking } from '../stack-tracking';
 
 describe('withStackTracking', () => {
   it('works correctly', () => {
@@ -30,6 +30,70 @@ describe('withStackTracking', () => {
       filename: __filename,
       line: 14,
       col: 14,
+    });
+  });
+});
+
+const stack0 = `Error:
+    at /foo/bar/buz.js:12:34
+    at /foo/bar/buz/qux.js:56:789`;
+
+const stack1 = `Error:
+    at Map.forEach (/foo/bar/buz.js:12:34)
+    at Map.forEach (/foo/bar/buz/qux.js:56:789)`;
+
+describe('parseStack', () => {
+  it('parses stack text into CodeStack', () => {
+    expect(parseStack(stack0, 0)).toEqual({
+      composed: '/foo/bar/buz.js:12:34',
+      filename: '/foo/bar/buz.js',
+      line: 12,
+      col: 34,
+    });
+    expect(parseStack(stack0, 1)).toEqual({
+      composed: '/foo/bar/buz/qux.js:56:789',
+      filename: '/foo/bar/buz/qux.js',
+      line: 56,
+      col: 789,
+    });
+    expect(parseStack(stack1, 0)).toEqual({
+      composed: '/foo/bar/buz.js:12:34',
+      filename: '/foo/bar/buz.js',
+      line: 12,
+      col: 34,
+    });
+    expect(parseStack(stack1, 1)).toEqual({
+      composed: '/foo/bar/buz/qux.js:56:789',
+      filename: '/foo/bar/buz/qux.js',
+      line: 56,
+      col: 789,
+    });
+  });
+
+  it('uses deepest stack if received too much depth', () => {
+    expect(parseStack(stack0, 2)).toEqual({
+      composed: '/foo/bar/buz/qux.js:56:789',
+      filename: '/foo/bar/buz/qux.js',
+      line: 56,
+      col: 789,
+    });
+    expect(parseStack(stack0, 100)).toEqual({
+      composed: '/foo/bar/buz/qux.js:56:789',
+      filename: '/foo/bar/buz/qux.js',
+      line: 56,
+      col: 789,
+    });
+    expect(parseStack(stack1, 2)).toEqual({
+      composed: '/foo/bar/buz/qux.js:56:789',
+      filename: '/foo/bar/buz/qux.js',
+      line: 56,
+      col: 789,
+    });
+    expect(parseStack(stack1, 100)).toEqual({
+      composed: '/foo/bar/buz/qux.js:56:789',
+      filename: '/foo/bar/buz/qux.js',
+      line: 56,
+      col: 789,
     });
   });
 });
