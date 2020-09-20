@@ -25,5 +25,14 @@ describe('reduceTaggedTemplate', () => {
       expect(result).toEqual(prev);
       expect(stringify).not.toBeCalled();
     }
+
+    {
+      const stringify = jest.fn(() => '');
+      const arr = [...acc];
+      const result = reduceTaggedTemplate(acc, ['-', '_'], [arr], stringify);
+      expect(result).toBe(acc);
+      expect(result).toEqual(['foo1bar', bar, 'baz', '-', 'foo1bar', bar, 'baz', '_']);
+      expect(stringify).not.toBeCalled();
+    }
   });
 });
