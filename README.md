@@ -201,8 +201,8 @@ typeshot.closeTrace();
 
 ```
 typeshot [--outFile <path> | --outDir <path>] [--basePath <path>] [--rootDir <dir>] [--project <path>]
-          [--prettierConfig <path>] [--systemModule <path>] [--maxParallel <count>] [--emitIntermediateFiles]
-          [--inputFile <path> | [--] <path>...]
+          [--prettierConfig <path>] [--systemModule <path>] [--maxParallel <count>] [--files]
+          [--emitIntermediateFiles] [--inputFile <path> | [--] <path>...]
 ```
 
 | Flag(Shorthand) | Default | Descriptions |
@@ -216,6 +216,7 @@ typeshot [--outFile <path> | --outDir <path>] [--basePath <path>] [--rootDir <di
 |`--prettierConfig`             | -                 | prettier config path |
 |`--systemModule`               | `'typescript'`    | see [System Module](#System-Module) |
 |`--maxParallel`                | 3                 | max number of subprocess |
+|`--files`                      | false             | load all files in project if this flag is enabled, turn on this flag only if the result has some problem |
 |`--emitIntermediateFiles`(`-E`)| false             | whether to emit intermediate files |
 |&lt;rest arguments&gt;         | -                 | input file paths |
 
