@@ -1,6 +1,8 @@
 import ts from 'typescript';
+import micromatch from 'micromatch';
 
 export const createTsProgram = (
+  files: string[] | null,
   basePath: string,
   project: string,
   sys: ts.System,
@@ -16,11 +18,19 @@ export const createTsProgram = (
   const readFileDefault = sys.readFile;
   host.readFile = (...args) => customFileReader(readFileDefault, ...args);
 
+  const { typeRoots } = options;
+  if (files && typeRoots) {
+    files = [
+      ...files,
+      ...micromatch(fileNames, [...typeRoots.map((typeRoot) => `${typeRoot}/(*|*/index(.d.ts|.ts))`)]),
+    ];
+  }
+
   const program = ts.createProgram({
     host,
     options,
     projectReferences,
-    rootNames: fileNames,
+    rootNames: files || fileNames,
   });
   const checker = program.getTypeChecker();
   const printer = ts.createPrinter();

@@ -22,6 +22,7 @@ export interface TypeshotOptions {
   basePath: string;
   project?: string;
   prettierOptions?: prettier.Options | string;
+  useFiles?: boolean;
   emitIntermediateFiles?: boolean;
 }
 
@@ -64,9 +65,13 @@ export const runSingle = async (sys: ts.System, options: TypeshotOptions) => {
   });
 
   const intermediateFiles = createIntermediateFiles(definitions);
-  const { program, checker, printer } = createTsProgram(basePath, project, sys, (readFile, path, encoding) => {
-    return intermediateFiles.get(path) || readFile(path, encoding);
-  });
+  const { program, checker, printer } = createTsProgram(
+    options.useFiles ? null : [...intermediateFiles.keys()],
+    basePath,
+    project,
+    sys,
+    (readFile, path, encoding) => intermediateFiles.get(path) || readFile(path, encoding),
+  );
   definitions.forEach((definition) => definition.evaluateIntermediateFile(program, checker, printer));
 
   const sourceText = inputFile.getFullText();

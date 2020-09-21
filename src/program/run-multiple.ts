@@ -2,7 +2,10 @@ import { evaluatePrallelly } from '../utils/evaluate-parallelly';
 import { TypeshotOptions } from './run-single';
 import { runSingleInSubprocess } from './run-single-in-subprocess';
 
-export type TypeshotCommonOptions = Omit<TypeshotOptions, 'inputFileName' | 'outputFileName'>;
+type CommonOptionKeys = Exclude<keyof TypeshotOptions, 'inputFileName' | 'outputFileName'>;
+export type TypeshotCommonOptions = {
+  [K in CommonOptionKeys]: TypeshotOptions[K];
+};
 
 export const runMultiple = async (
   entries: (readonly [input: string, output: string])[],

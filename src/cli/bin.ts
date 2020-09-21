@@ -18,6 +18,7 @@ interface CLIOptionsWide {
   basePath?: string;
   project?: string;
   rootDir?: string;
+  useFiles?: boolean;
   emitIntermediateFiles?: boolean;
   prettierConfig?: string;
   systemModule?: string;
@@ -92,6 +93,7 @@ export const parseCLIOptions = (argv: string[]) => {
       '--prettierConfig': String,
       '--systemModule': String,
       '--maxParallel': Number,
+      '--files': Boolean,
       // Aliases
       '-h': '--help',
       '-p': '--project',
@@ -113,6 +115,7 @@ export const parseCLIOptions = (argv: string[]) => {
     '--outDir': outDir,
     '--rootDir': rootDir,
     '--basePath': basePath,
+    '--files': useFiles,
     '--emitIntermediateFiles': emitIntermediateFiles,
     '--prettierConfig': prettierConfig,
     '--systemModule': systemModule,
@@ -130,6 +133,7 @@ export const parseCLIOptions = (argv: string[]) => {
       project,
       basePath,
       rootDir,
+      useFiles,
       emitIntermediateFiles,
       prettierConfig,
       systemModule,
@@ -143,8 +147,8 @@ const exitWithHelp = (error?: string) => {
   console.log(`
 SYNOPSIS
 typeshot [--outFile <path> | --outDir <path>] [--basePath <path>] [--rootDir <dir>] [--project <path>]
-          [--prettierConfig <path>] [--systemModule <path>] [--maxParallel <count>] [--emitIntermediateFiles]
-          [--inputFile <path> | [--] <path>...]
+          [--prettierConfig <path>] [--systemModule <path>] [--maxParallel <count>] [--files]
+          [--emitIntermediateFiles] [--inputFile <path> | [--] <path>...]
 
 OPTIONS
         <path>...
@@ -180,6 +184,9 @@ OPTIONS
         --maxParallel
             max number of subprocess, default value is 3
 
+        --files
+            load all files in project if this flag is enabled, turn on this flag only if the result has some problem
+
         -E, --emitIntermediateFiles
             whether to emit intermediate files, default value is false
 `);
@@ -207,6 +214,7 @@ const main = async () => {
     project: cliOptions.project,
     prettierOptions: cliOptions.prettierConfig,
     emitIntermediateFiles: cliOptions.emitIntermediateFiles,
+    useFiles: cliOptions.useFiles,
   };
 
   try {
